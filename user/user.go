@@ -21,9 +21,9 @@ type User struct {
 	Email     string `datastore:"email"`
 	AvatarURL string `datastore:"avatar,noindex"`
 	Active    bool
-	hash      []byte `datastore:"hash,noindex"`
-	salt      []byte `datastore:"salt,noindex"`
-	providers []provider
+	Hash      []byte `datastore:"hash,noindex"`
+	Salt      []byte `datastore:"salt,noindex"`
+	Providers []provider
 }
 
 const saltSize = 16
@@ -57,8 +57,8 @@ func (u *User) SetPassword(pass string) error {
 	h.Write(salt)
 	h.Write([]byte(pass))
 
-	u.hash = h.Sum(nil)
-	u.salt = salt
+	u.Hash = h.Sum(nil)
+	u.Salt = salt
 
 	return nil
 }
@@ -66,25 +66,25 @@ func (u *User) SetPassword(pass string) error {
 // Check password returns whether the provided argument
 // matches the set password for the user.
 func (u *User) CheckPassword(pass string) bool {
-	if u.salt == nil || u.hash == nil {
+	if u.Salt == nil || u.Hash == nil {
 		return false
 	}
 
 	h := sha256.New()
-	h.Write(u.salt)
+	h.Write(u.Salt)
 	h.Write([]byte(pass))
 
-	return bytes.Equal(h.Sum(nil), u.hash)
+	return bytes.Equal(h.Sum(nil), u.Hash)
 }
 
 // HasProvider checks whether the user is associated
 // with the provider given as an argument.
 func (u *User) HasProvider(providerName string) bool {
-	if u.providers == nil {
+	if u.Providers == nil {
 		return false
 	}
 
-	for _, prov := range u.providers {
+	for _, prov := range u.Providers {
 		if prov.name == providerName {
 			return true
 		}
@@ -106,10 +106,10 @@ func (u *User) AddProvider(providerName, providerUserId string) error {
 		return errors.New("user is already registered with this provider")
 	}
 
-	if u.providers == nil {
-		u.providers = make([]provider, 1)
+	if u.Providers == nil {
+		u.Providers = make([]provider, 1)
 	}
-	u.providers[0] = provider{name: providerName, id: providerUserId}
+	u.Providers[0] = provider{name: providerName, id: providerUserId}
 
 	return nil
 }
@@ -131,8 +131,8 @@ func (u *User) Merge(newUser *User) *User {
 	if newUser.AvatarURL != "" {
 		mergedUser.AvatarURL = newUser.AvatarURL
 	}
-	if newUser.providers != nil {
-		for _, prov := range newUser.providers {
+	if newUser.Providers != nil {
+		for _, prov := range newUser.Providers {
 			mergedUser.AddProvider(prov.name, prov.id)
 		}
 	}

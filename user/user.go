@@ -10,9 +10,9 @@ import (
 	"io"
 )
 
-type provider struct {
-	name string
-	id   string
+type Provider struct {
+	Name string
+	Id   string
 }
 
 // User stores a user of the application, login-wise.
@@ -23,7 +23,7 @@ type User struct {
 	Active    bool
 	Hash      []byte `datastore:"hash,noindex"`
 	Salt      []byte `datastore:"salt,noindex"`
-	Providers []provider
+	Providers []Provider
 }
 
 const saltSize = 16
@@ -85,7 +85,7 @@ func (u *User) HasProvider(providerName string) bool {
 	}
 
 	for _, prov := range u.Providers {
-		if prov.name == providerName {
+		if prov.Name == providerName {
 			return true
 		}
 	}
@@ -107,9 +107,9 @@ func (u *User) AddProvider(providerName, providerUserId string) error {
 	}
 
 	if u.Providers == nil {
-		u.Providers = make([]provider, 1)
+		u.Providers = make([]Provider, 1)
 	}
-	u.Providers[0] = provider{name: providerName, id: providerUserId}
+	u.Providers[0] = Provider{Name: providerName, Id: providerUserId}
 
 	return nil
 }
@@ -133,7 +133,7 @@ func (u *User) Merge(newUser *User) *User {
 	}
 	if newUser.Providers != nil {
 		for _, prov := range newUser.Providers {
-			mergedUser.AddProvider(prov.name, prov.id)
+			mergedUser.AddProvider(prov.Name, prov.Id)
 		}
 	}
 	return mergedUser

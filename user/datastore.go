@@ -26,6 +26,10 @@ func AddUser(c appengine.Context, user *User) (*datastore.Key, error) {
 // Returns the key of the entry, the user structure and a possible error.
 // The key and the user are nil if there is no user stored with the provided email.
 func GetUserByEmail(c appengine.Context, email string) (*datastore.Key, *User, error) {
+	if email == "" {
+		return nil, nil, InvalidEmailErr
+	}
+
 	query := datastore.NewQuery(UserKind).Filter("email =", string(email))
 
 	for t := query.Run(c); ; {
@@ -48,6 +52,10 @@ func GetUserByEmail(c appengine.Context, email string) (*datastore.Key, *User, e
 // Returns the key of the entry. Returns an error if there is no user with the
 // provided email or if there is an error returned by the datastore.
 func UpdateUser(c appengine.Context, prevEmail string, user *User) (*datastore.Key, error) {
+	if prevEmail == "" {
+		return nil, InvalidEmailErr
+	}
+
 	if user == nil {
 		return nil, errors.New("user to update to datastore can't be empty")
 	}
@@ -68,7 +76,7 @@ func UpdateUser(c appengine.Context, prevEmail string, user *User) (*datastore.K
 // error returned by the datastore.
 func DeleteUSer(c appengine.Context, email string) error {
 	if email == "" {
-		return errors.New("must have valid email address to delete user")
+		return InvalidEmailErr
 	}
 
 	key, _, err := GetUserByEmail(c, email)

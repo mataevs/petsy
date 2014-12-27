@@ -28,6 +28,8 @@ type User struct {
 
 const saltSize = 16
 
+var InvalidEmailErr = errors.New("invalid email address")
+
 // NewUser creates new user with given name and email.
 // Returns an error if the name and email are empty.
 func NewUser(name, email string) (*User, error) {
@@ -36,7 +38,7 @@ func NewUser(name, email string) (*User, error) {
 	}
 	if email == "" {
 		// todo - check valid email
-		return nil, errors.New("must provide valid email for user.")
+		return nil, InvalidEmailErr
 	}
 
 	return &User{
@@ -117,24 +119,24 @@ func (u *User) AddProvider(providerName, providerUserId string) error {
 // Merge combines 2 user structures - the old one (the reference) and
 // the new one (provided as an argument). The values provided by the
 // new user take precedence over the old values.
-func (u *User) Merge(newUser *User) *User {
-	mergedUser := new(User)
+// func (u *User) Merge(newUser *User) *User {
+// 	mergedUser := new(User)
 
-	*mergedUser = *u
+// 	*mergedUser = *u
 
-	if newUser.Name != "" {
-		mergedUser.Name = newUser.Name
-	}
-	if newUser.Email != "" {
-		mergedUser.Email = newUser.Email
-	}
-	if newUser.AvatarURL != "" {
-		mergedUser.AvatarURL = newUser.AvatarURL
-	}
-	if newUser.Providers != nil {
-		for _, prov := range newUser.Providers {
-			mergedUser.AddProvider(prov.Name, prov.Id)
-		}
-	}
-	return mergedUser
-}
+// 	if newUser.Name != "" {
+// 		mergedUser.Name = newUser.Name
+// 	}
+// 	if newUser.Email != "" {
+// 		mergedUser.Email = newUser.Email
+// 	}
+// 	if newUser.AvatarURL != "" {
+// 		mergedUser.AvatarURL = newUser.AvatarURL
+// 	}
+// 	if newUser.Providers != nil {
+// 		for _, prov := range newUser.Providers {
+// 			mergedUser.AddProvider(prov.Name, prov.Id)
+// 		}
+// 	}
+// 	return mergedUser
+// }

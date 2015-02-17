@@ -42,8 +42,9 @@ func NewUser(name, email string) (*User, error) {
 	}
 
 	return &User{
-		Name:  name,
-		Email: email,
+		Name:   name,
+		Email:  email,
+		Active: false,
 	}, nil
 }
 
@@ -115,28 +116,3 @@ func (u *User) AddProvider(providerName, providerUserId string) error {
 
 	return nil
 }
-
-// Merge combines 2 user structures - the old one (the reference) and
-// the new one (provided as an argument). The values provided by the
-// new user take precedence over the old values.
-// func (u *User) Merge(newUser *User) *User {
-// 	mergedUser := new(User)
-
-// 	*mergedUser = *u
-
-// 	if newUser.Name != "" {
-// 		mergedUser.Name = newUser.Name
-// 	}
-// 	if newUser.Email != "" {
-// 		mergedUser.Email = newUser.Email
-// 	}
-// 	if newUser.AvatarURL != "" {
-// 		mergedUser.AvatarURL = newUser.AvatarURL
-// 	}
-// 	if newUser.Providers != nil {
-// 		for _, prov := range newUser.Providers {
-// 			mergedUser.AddProvider(prov.Name, prov.Id)
-// 		}
-// 	}
-// 	return mergedUser
-// }

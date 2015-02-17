@@ -89,3 +89,7 @@ func DeleteUSer(c appengine.Context, email string) error {
 
 	return datastore.Delete(c, key)
 }
+
+func ActivateUser(c appengine.Context, email string) error {
+
+}

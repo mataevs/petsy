@@ -94,6 +94,36 @@ func GetValue(c appengine.Context, key string) (*datastore.Key, *Entry, error) {
 	return nil, nil, nil
 }
 
+func GetEntriesSameValueScope(c appengine.Context, value string, scope string) ([]*datastore.Key, []*Entry, error) {
+	if value == "" {
+		return nil, nil, errors.New("value can't be empty")
+	}
+	if scope == "" {
+		return nil, nil, errors.New("scope can't be empty")
+	}
+
+	query := datastore.NewQuery(HashKind).
+		Filter("value =", string(value)).
+		Filter("scope =", string(scope))
+
+	keys := make([]*datastore.Key, 0)
+	entries := make([]*Entry, 0)
+
+	for t := query.Run(c); ; {
+		var entry Entry
+		key, err := t.Next(&entry)
+		if err == datastore.Done {
+			return keys, entries, nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+
+		keys = append(keys, key)
+		entries = append(entries, &entry)
+	}
+}
+
 // IsValidEntry checks whether the parameters are found in a valid stored entry.
 // If no entry is found, NoSuchKeyErr is returned as an error.
 // If the entry is valid, the boolean value returned is true. If the entry is expired, the returned

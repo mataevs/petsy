@@ -36,10 +36,6 @@ func NewUser(name, email string) (*User, error) {
 	if name == "" {
 		return nil, errors.New("must provide valid name for user.")
 	}
-	if email == "" {
-		// todo - check valid email
-		return nil, InvalidEmailErr
-	}
 
 	return &User{
 		Name:   name,

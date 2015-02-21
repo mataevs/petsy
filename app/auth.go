@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"petsy/hashstore"
 	petsyuser "petsy/user"
 
 	"github.com/gorilla/mux"
@@ -18,6 +19,14 @@ import (
 
 	"appengine"
 	"appengine/urlfetch"
+)
+
+const (
+	REGISTER_SCOPE = "register"
+)
+
+var (
+	ActivationLimit, _ = Duration.ParseDuration("168h")
 )
 
 func init() {
@@ -76,6 +85,7 @@ func register(c *Context, w io.Writer, r *http.Request) error {
 	email := r.PostFormValue("email")
 	pass := r.PostFormValue("password")
 
+	// Check if this username is already taken.
 	_, user, err := petsyuser.GetUserByEmail(c.ctx, email)
 	if err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
@@ -86,15 +96,20 @@ func register(c *Context, w io.Writer, r *http.Request) error {
 		return nil
 	}
 
+	// Create the user.
 	u, err := petsyuser.NewUser(name, email)
 	if err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	}
 	u.SetPassword(pass)
 
+	// Add the user to the datastore.
 	if _, err := petsyuser.AddUser(c.ctx, u); err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	}
+
+	// Add a validation key and send a confirmation email.
+	hashstore.AddEntry(c, key, email, REGISTER_SCOPE, ActivationLimit)
 
 	w.Write([]byte("user created"))
 	return nil

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"petsy/hashstore"
+	"petsy/mailer"
 	petsyuser "petsy/user"
 
 	"github.com/gorilla/mux"
@@ -26,7 +27,8 @@ const (
 )
 
 var (
-	ActivationLimit, _ = Duration.ParseDuration("168h")
+	// Activation link validity period.
+	ActivationLimit, _ = time.ParseDuration("168h")
 )
 
 func init() {
@@ -35,11 +37,11 @@ func init() {
 		facebook.New(
 			"605904936182713",
 			"5fd71dbe58865e18ffc3f916a685b41c",
-			"http://localhost:8080/auth/facebook/callback"),
+			"http://ro-petsy.appspot.com/auth/facebook/callback"),
 		google.New(
 			"494043376895-hl0dvi5jmhkprfpa354nelr77afk2546.apps.googleusercontent.com",
 			"tdwi4BcpVfyq9AXwox8EQLQ5",
-			"http://localhost:8080/auth/google/callback"),
+			"http://ro-petsy.appspot.com/auth/google/callback"),
 	)
 
 	auth := mux.NewRouter().PathPrefix("/auth/").Subrouter()
@@ -109,7 +111,25 @@ func register(c *Context, w io.Writer, r *http.Request) error {
 	}
 
 	// Add a validation key and send a confirmation email.
-	hashstore.AddEntry(c, key, email, REGISTER_SCOPE, ActivationLimit)
+	key, err := randomString(32)
+	if err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+	hashstore.AddEntry(c.ctx, key, email, REGISTER_SCOPE, ActivationLimit)
+
+	// Send confirmation email
+	message := "http://petsy-ro.appspot.com" +
+		"/api/verification?" + "hash=" + key +
+		"&scope=" + REGISTER_SCOPE +
+		"&email=" + email
+
+	if err := mailer.SendEmail(c.ctx,
+		[]string{email},
+		"noreply@petsy-ro.appspotmail.com",
+		"Petsy.ro - Account Details for "+name,
+		message); err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
 
 	w.Write([]byte("user created"))
 	return nil

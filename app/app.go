@@ -8,8 +8,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-
-	"petsy/mailer"
 )
 
 var store *sessions.CookieStore
@@ -35,6 +33,8 @@ func init() {
 	api.Handle("/profile/pet/{pet}", appHandler(getPetProfile)).Methods("GET")
 
 	api.Handle("/find", appHandler(findSitters)).Methods("POST")
+
+	api.Handle("/verification", appHandler(verify)).Methods("GET")
 
 	http.Handle("/api/", api)
 }
@@ -66,4 +66,22 @@ func getPetProfile(c *Context, w io.Writer, r *http.Request) error {
 
 func findSitters(c *Context, w io.Writer, r *http.Request) error {
 	return appErrorf(http.StatusNotFound, "not implemented")
+}
+
+func verify(c *Context, w io.Writer, r *http.Request) error {
+	queryValues := r.URL.Query()
+
+	hash := queryValues.Get("hash")
+	scope := queryValues.Get("scope")
+	email := queryValues.Get("email")
+
+	if hash == "" || scope == "" || email == "" {
+		return appErrorf(http.StatusNotFound, "Link does not exist.")
+	}
+
+	responseString := fmt.Sprintf("Hash=%s Scope=%s Email=%s", hash, scope, email)
+
+	w.Write([]byte(responseString))
+
+	return nil
 }

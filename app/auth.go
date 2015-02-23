@@ -110,24 +110,7 @@ func register(c *Context, w io.Writer, r *http.Request) error {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	}
 
-	// Add a validation key and send a confirmation email.
-	key, err := randomString(32)
-	if err != nil {
-		return appErrorf(http.StatusInternalServerError, "%v", err)
-	}
-	hashstore.AddEntry(c.ctx, key, email, REGISTER_SCOPE, ActivationLimit)
-
-	// Send confirmation email
-	message := "http://petsy-ro.appspot.com" +
-		"/api/verification?" + "hash=" + key +
-		"&scope=" + REGISTER_SCOPE +
-		"&email=" + email
-
-	if err := mailer.SendEmail(c.ctx,
-		[]string{email},
-		"noreply@petsy-ro.appspotmail.com",
-		"Petsy.ro - Account Details for "+name,
-		message); err != nil {
+	if err := generateActivationLink(c, name, email); err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	}
 
@@ -153,6 +136,11 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	if !user.CheckPassword(pass) {
 		http.Error(w, "bad password", http.StatusForbidden)
+		return
+	}
+
+	if !user.Active {
+		http.Error(w, "User is not activated. Please check your e-mail for the activation link.", http.StatusUnauthorized)
 		return
 	}
 
@@ -282,4 +270,29 @@ func createUserSession(user *petsyuser.User, w http.ResponseWriter, r *http.Requ
 	c.user = user
 
 	return c.session.Save(r, w)
+}
+
+func generateActivationLink(c *Context, name, email string) error {
+	// Add a validation key and send a confirmation email.
+	key, err := randomString(32)
+	if err != nil {
+		return err
+	}
+	hashstore.AddEntry(c.ctx, key, email, REGISTER_SCOPE, ActivationLimit)
+
+	// Send confirmation email
+	message := "http://petsy-ro.appspot.com" +
+		"/api/verification?" + "hash=" + key +
+		"&scope=" + REGISTER_SCOPE +
+		"&email=" + email
+
+	if err := mailer.SendEmail(c.ctx,
+		[]string{email},
+		"noreply@petsy-ro.appspotmail.com",
+		"Petsy.ro - Account Details for "+name,
+		message); err != nil {
+		return err
+	}
+
+	return nil
 }

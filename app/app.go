@@ -5,6 +5,9 @@ import (
 	"io"
 	"net/http"
 
+	"petsy/hashstore"
+	petsyuser "petsy/user"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
@@ -34,7 +37,7 @@ func init() {
 
 	api.Handle("/find", appHandler(findSitters)).Methods("POST")
 
-	api.Handle("/verification", appHandler(verify)).Methods("GET")
+	api.Handle("/verification", appHandler(verifyLink)).Methods("GET")
 
 	http.Handle("/api/", api)
 }
@@ -68,20 +71,58 @@ func findSitters(c *Context, w io.Writer, r *http.Request) error {
 	return appErrorf(http.StatusNotFound, "not implemented")
 }
 
-func verify(c *Context, w io.Writer, r *http.Request) error {
+func verifyLink(c *Context, w io.Writer, r *http.Request) error {
 	queryValues := r.URL.Query()
 
 	hash := queryValues.Get("hash")
 	scope := queryValues.Get("scope")
 	email := queryValues.Get("email")
 
+	w.Write([]byte(fmt.Sprintf("hash=%s scope=%s email=%s", hash, scope, email)))
+
+	// Check query parameters values.
 	if hash == "" || scope == "" || email == "" {
 		return appErrorf(http.StatusNotFound, "Link does not exist.")
 	}
 
-	responseString := fmt.Sprintf("Hash=%s Scope=%s Email=%s", hash, scope, email)
+	// Check validation link validity.
+	if valid, err := hashstore.IsValidEntry(c.ctx, hash, email, scope); err == hashstore.NoSuchKeyErr {
+		return appErrorf(http.StatusNotFound, "Link does not exist.")
+	} else if err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	} else if !valid {
+		w.Write([]byte("Confirmation link has expired."))
 
-	w.Write([]byte(responseString))
+		// todo - add logic for sending a new activation link.
+
+		return nil
+	}
+
+	// Get user from datastore.
+	_, user, err := petsyuser.GetUserByEmail(c.ctx, email)
+	if err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+
+	// Perform action depending on scope.
+	switch scope {
+	case "register":
+		user.Active = true
+		// Mark the user as active.
+		if _, err := petsyuser.UpdateUser(c.ctx, user.Email, user); err != nil {
+			return appErrorf(http.StatusInternalServerError, "%v", err)
+		}
+
+		// Delete hashstore entry.
+		if hashstore.DeleteEntry(c.ctx, hash); err != nil {
+			return appErrorf(http.StatusInternalServerError, "%v", err)
+		}
+
+		w.Write([]byte("User account activated. You can now login."))
+		return nil
+	default:
+		return appErrorf(http.StatusUnauthorized, "Unknown scope.")
+	}
 
 	return nil
 }

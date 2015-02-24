@@ -10,6 +10,7 @@ import (
 	"petsy/hashstore"
 	"petsy/mailer"
 	petsyuser "petsy/user"
+	. "petsy/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/gomniauth"
@@ -87,15 +88,23 @@ func register(c *Context, w io.Writer, r *http.Request) error {
 	email := r.PostFormValue("email")
 	pass := r.PostFormValue("password")
 
+	if IsEmpty(name) {
+		return appErrorf(http.StatusForbidden, "Name cannot be empty.")
+	}
+	if IsEmpty(email) {
+		return appErrorf(http.StatusForbidden, "Email cannot be empty.")
+	}
+	if IsEmpty(pass) {
+		return appErrorf(http.StatusForbidden, "Password cannot be empty.")
+	}
+
 	// Check if this username is already taken.
 	_, user, err := petsyuser.GetUserByEmail(c.ctx, email)
 	if err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	}
 	if user != nil {
-		// todo - user email collision
-		w.Write([]byte("user already exists"))
-		return nil
+		return appErrorf(http.StatusForbidden, "This email already exists.")
 	}
 
 	// Create the user.
@@ -124,6 +133,13 @@ func login(w http.ResponseWriter, r *http.Request) {
 	email := r.PostFormValue("email")
 	pass := r.PostFormValue("password")
 
+	if IsEmpty(email) {
+		http.Error(w, "Email cannot be empty.", http.StatusForbidden)
+	}
+	if IsEmpty(pass) {
+		http.Error(w, "Password cannot be empty.", http.StatusForbidden)
+	}
+
 	_, user, err := petsyuser.GetUserByEmail(c, email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -133,12 +149,10 @@ func login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user does not exist", http.StatusForbidden)
 		return
 	}
-
 	if !user.CheckPassword(pass) {
 		http.Error(w, "bad password", http.StatusForbidden)
 		return
 	}
-
 	if !user.Active {
 		http.Error(w, "User is not activated. Please check your e-mail for the activation link.", http.StatusUnauthorized)
 		return
@@ -231,7 +245,7 @@ func callbackHandler(providerName string) http.HandlerFunc {
 	}
 }
 
-func addOrUpdateUser(c appengine.Context, name, email string, provider, providerId string) (*petsyuser.User, error) {
+func addOrUpdateUser(c appengine.Context, name, email, provider, providerId string) (*petsyuser.User, error) {
 	_, user, err := petsyuser.GetUserByEmail(c, email)
 	if err != nil {
 		return nil, err

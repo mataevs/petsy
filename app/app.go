@@ -1,13 +1,13 @@
 package petsy
 
 import (
-	"fmt"
 	"html/template"
 	"io"
 	"net/http"
 
 	"petsy/hashstore"
 	petsyuser "petsy/user"
+	. "petsy/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
@@ -82,10 +82,8 @@ func verifyLink(c *Context, w io.Writer, r *http.Request) error {
 	scope := queryValues.Get("scope")
 	email := queryValues.Get("email")
 
-	w.Write([]byte(fmt.Sprintf("hash=%s scope=%s email=%s", hash, scope, email)))
-
 	// Check query parameters values.
-	if hash == "" || scope == "" || email == "" {
+	if IsEmpty(hash) || IsEmpty(scope) || IsEmpty(email) {
 		return appErrorf(http.StatusNotFound, "Link does not exist.")
 	}
 
@@ -95,10 +93,8 @@ func verifyLink(c *Context, w io.Writer, r *http.Request) error {
 	} else if err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	} else if !valid {
-		w.Write([]byte("Confirmation link has expired."))
-
-		// todo - add logic for sending a new activation link.
-
+		w.Write([]byte("Confirmation link has expired.\n"))
+		w.Write([]byte("Click <a href=\"/api/resend-activation-link.html\">here</a> for a new activation link.\n"))
 		return nil
 	}
 
@@ -106,6 +102,9 @@ func verifyLink(c *Context, w io.Writer, r *http.Request) error {
 	_, user, err := petsyuser.GetUserByEmail(c.ctx, email)
 	if err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+	if IsEmpty(user) {
+		return appErrorf(http.StatusNotFound, "No user found.")
 	}
 
 	// Perform action depending on scope.
@@ -141,10 +140,10 @@ func resendActivationLink(c *Context, w io.Writer, r *http.Request) error {
 	email := r.PostFormValue("email")
 	pass := r.PostFormValue("password")
 
-	if email == "" {
+	if IsEmpty(email) {
 		return appErrorf(http.StatusForbidden, "Email address cannot be empty.")
 	}
-	if pass == "" {
+	if IsEmpty(pass) {
 		return appErrorf(http.StatusForbidden, "Password cannot be empty.")
 	}
 
@@ -153,11 +152,9 @@ func resendActivationLink(c *Context, w io.Writer, r *http.Request) error {
 	if err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	}
-
 	if user == nil {
 		return appErrorf(http.StatusForbidden, "Non-existent user or bad password.")
 	}
-
 	if !user.CheckPassword(pass) {
 		return appErrorf(http.StatusForbidden, "Non-existent user or bad password.")
 	}

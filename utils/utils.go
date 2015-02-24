@@ -12,3 +12,14 @@ func IsEmailAddress(email string) bool {
 	// return exp.MatchString(email)
 	return true
 }
+
+func IsEmpty(value interface{}) bool {
+	switch value.(type) {
+	case string:
+		return value == ""
+	case int:
+		return value == 0
+	default:
+		return value == nil
+	}
+}

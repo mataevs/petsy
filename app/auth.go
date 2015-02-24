@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"petsy/hashstore"
-	"petsy/mailer"
 	petsyuser "petsy/user"
 	. "petsy/utils"
 
@@ -46,6 +44,7 @@ func init() {
 	)
 
 	auth := mux.NewRouter().PathPrefix("/auth/").Subrouter()
+
 	auth.Handle("/facebook/login", loginHandler("facebook"))
 	auth.Handle("/facebook/callback", callbackHandler("facebook"))
 	auth.Handle("/google/login", loginHandler("google"))
@@ -284,29 +283,4 @@ func createUserSession(user *petsyuser.User, w http.ResponseWriter, r *http.Requ
 	c.user = user
 
 	return c.session.Save(r, w)
-}
-
-func generateActivationLink(c *Context, name, email string) error {
-	// Add a validation key and send a confirmation email.
-	key, err := randomString(32)
-	if err != nil {
-		return err
-	}
-	hashstore.AddEntry(c.ctx, key, email, REGISTER_SCOPE, ActivationLimit)
-
-	// Send confirmation email
-	message := "http://petsy-ro.appspot.com" +
-		"/api/verification?" + "hash=" + key +
-		"&scope=" + REGISTER_SCOPE +
-		"&email=" + email
-
-	if err := mailer.SendEmail(c.ctx,
-		[]string{email},
-		"noreply@petsy-ro.appspotmail.com",
-		"Petsy.ro - Account Details for "+name,
-		message); err != nil {
-		return err
-	}
-
-	return nil
 }

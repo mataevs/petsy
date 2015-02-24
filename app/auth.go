@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"petsy/hashstore"
 	petsyuser "petsy/user"
+	. "petsy/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/gomniauth"
@@ -26,7 +26,8 @@ const (
 )
 
 var (
-	ActivationLimit, _ = Duration.ParseDuration("168h")
+	// Activation link validity period.
+	ActivationLimit, _ = time.ParseDuration("168h")
 )
 
 func init() {
@@ -35,14 +36,15 @@ func init() {
 		facebook.New(
 			"605904936182713",
 			"5fd71dbe58865e18ffc3f916a685b41c",
-			"http://localhost:8080/auth/facebook/callback"),
+			"http://ro-petsy.appspot.com/auth/facebook/callback"),
 		google.New(
 			"494043376895-hl0dvi5jmhkprfpa354nelr77afk2546.apps.googleusercontent.com",
 			"tdwi4BcpVfyq9AXwox8EQLQ5",
-			"http://localhost:8080/auth/google/callback"),
+			"http://ro-petsy.appspot.com/auth/google/callback"),
 	)
 
 	auth := mux.NewRouter().PathPrefix("/auth/").Subrouter()
+
 	auth.Handle("/facebook/login", loginHandler("facebook"))
 	auth.Handle("/facebook/callback", callbackHandler("facebook"))
 	auth.Handle("/google/login", loginHandler("google"))
@@ -85,15 +87,23 @@ func register(c *Context, w io.Writer, r *http.Request) error {
 	email := r.PostFormValue("email")
 	pass := r.PostFormValue("password")
 
+	if IsEmpty(name) {
+		return appErrorf(http.StatusForbidden, "Name cannot be empty.")
+	}
+	if IsEmpty(email) {
+		return appErrorf(http.StatusForbidden, "Email cannot be empty.")
+	}
+	if IsEmpty(pass) {
+		return appErrorf(http.StatusForbidden, "Password cannot be empty.")
+	}
+
 	// Check if this username is already taken.
 	_, user, err := petsyuser.GetUserByEmail(c.ctx, email)
 	if err != nil {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	}
 	if user != nil {
-		// todo - user email collision
-		w.Write([]byte("user already exists"))
-		return nil
+		return appErrorf(http.StatusForbidden, "This email already exists.")
 	}
 
 	// Create the user.
@@ -108,8 +118,9 @@ func register(c *Context, w io.Writer, r *http.Request) error {
 		return appErrorf(http.StatusInternalServerError, "%v", err)
 	}
 
-	// Add a validation key and send a confirmation email.
-	hashstore.AddEntry(c, key, email, REGISTER_SCOPE, ActivationLimit)
+	if err := generateActivationLink(c, name, email); err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
 
 	w.Write([]byte("user created"))
 	return nil
@@ -121,6 +132,13 @@ func login(w http.ResponseWriter, r *http.Request) {
 	email := r.PostFormValue("email")
 	pass := r.PostFormValue("password")
 
+	if IsEmpty(email) {
+		http.Error(w, "Email cannot be empty.", http.StatusForbidden)
+	}
+	if IsEmpty(pass) {
+		http.Error(w, "Password cannot be empty.", http.StatusForbidden)
+	}
+
 	_, user, err := petsyuser.GetUserByEmail(c, email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -130,9 +148,12 @@ func login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user does not exist", http.StatusForbidden)
 		return
 	}
-
 	if !user.CheckPassword(pass) {
 		http.Error(w, "bad password", http.StatusForbidden)
+		return
+	}
+	if !user.Active {
+		http.Error(w, "User is not activated. Please check your e-mail for the activation link.", http.StatusUnauthorized)
 		return
 	}
 
@@ -223,7 +244,7 @@ func callbackHandler(providerName string) http.HandlerFunc {
 	}
 }
 
-func addOrUpdateUser(c appengine.Context, name, email string, provider, providerId string) (*petsyuser.User, error) {
+func addOrUpdateUser(c appengine.Context, name, email, provider, providerId string) (*petsyuser.User, error) {
 	_, user, err := petsyuser.GetUserByEmail(c, email)
 	if err != nil {
 		return nil, err

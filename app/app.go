@@ -1,15 +1,12 @@
 package petsy
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-
-	"petsy/mailer"
 )
 
 var store *sessions.CookieStore

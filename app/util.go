@@ -2,8 +2,6 @@ package petsy
 
 import (
 	"bytes"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +11,7 @@ import (
 	"petsy/user"
 
 	"appengine"
+	"appengine/datastore"
 
 	"github.com/gorilla/sessions"
 )
@@ -29,6 +28,7 @@ type Context struct {
 	ctx     appengine.Context
 	session *sessions.Session
 	user    *user.User
+	userKey *datastore.Key
 }
 
 func NewContext(r *http.Request) (*Context, error) {
@@ -54,9 +54,7 @@ func NewContext(r *http.Request) (*Context, error) {
 		return ctx, nil
 	}
 	if email, ok := sess.Values["user"].(string); ok {
-		_, user, err := user.GetUserByEmail(c, email)
-
-		ctx.user = user
+		ctx.userKey, ctx.user, err = user.GetUserByEmail(c, email)
 		return ctx, err
 	}
 
@@ -129,19 +127,4 @@ func (h authReq) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(code)
 	logf(err.Error())
 	fmt.Fprint(w, err)
-}
-
-func randomString(size int) (string, error) {
-	if size <= 0 {
-		return "", errors.New("size cannot be less than 1.")
-	}
-
-	buffer := make([]byte, size)
-	_, err := rand.Read(buffer)
-
-	if err != nil {
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(buffer), nil
 }

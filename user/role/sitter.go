@@ -42,6 +42,10 @@ func AddSitter(c appengine.Context, sitter *Sitter) (*datastore.Key, error) {
 	return AddSitterForUser(c, sitter, userKey)
 }
 
+func UpdateSitter(c appengine.Context, sitterKey *datastore.Key, sitter *Sitter) (*datastore.Key, error) {
+	return datastore.Put(c, sitterKey, sitter)
+}
+
 func AddSitterForUser(c appengine.Context, sitter *Sitter, userKey *datastore.Key) (*datastore.Key, error) {
 	sitter.userid = userKey.Encode()
 
@@ -55,6 +59,28 @@ func GetSitter(c appengine.Context, userKey *datastore.Key) (*datastore.Key, *Si
 	}
 
 	query := datastore.NewQuery(SitterKind).Ancestor(userKey)
+
+	for t := query.Run(c); ; {
+		var sitter Sitter
+		key, err := t.Next(&sitter)
+		if err == datastore.Done {
+			return nil, nil, nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		return key, &sitter, nil
+	}
+
+	return nil, nil, nil
+}
+
+func GetSitterFromEmail(c appengine.Context, userEmail string) (*datastore.Key, *Sitter, error) {
+	if userEmail == "" {
+		return nil, nil, errors.New("user email cannot be nil.")
+	}
+
+	query := datastore.NewQuery(SitterKind).Filter("email =", userEmail)
 
 	for t := query.Run(c); ; {
 		var sitter Sitter

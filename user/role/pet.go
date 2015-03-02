@@ -22,7 +22,7 @@ const (
 )
 
 func AddPet(c appengine.Context, pet *Pet, owner *Owner) (*datastore.Key, error) {
-	ownerKey, owner, err := GetOwner(c, owner.Email)
+	ownerKey, owner, err := GetOwnerFromEmail(c, owner.Email)
 	if err != nil {
 		return nil, err
 	}

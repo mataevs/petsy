@@ -21,6 +21,10 @@ const (
 	PetKind = "pets"
 )
 
+func (p Pet) Validate() error {
+	return nil
+}
+
 func AddPet(c appengine.Context, pet *Pet, owner *Owner) (*datastore.Key, error) {
 	ownerKey, owner, err := GetOwnerFromEmail(c, owner.Email)
 	if err != nil {
@@ -30,8 +34,38 @@ func AddPet(c appengine.Context, pet *Pet, owner *Owner) (*datastore.Key, error)
 		return nil, errors.New("Cannot find owner with specified email.")
 	}
 
+	return AddPetForOwner(c, pet, ownerKey)
+}
+
+func AddPetForOwner(c appengine.Context, pet *Pet, ownerKey *datastore.Key) (*datastore.Key, error) {
 	pet.ownerid = ownerKey.Encode()
 
 	petKey := datastore.NewIncompleteKey(c, PetKind, ownerKey)
 	return datastore.Put(c, petKey, pet)
+}
+
+func UpdatePet(c appengine.Context, petKey *datastore.Key, pet *Pet) (*datastore.Key, error) {
+	return datastore.Put(c, petKey, pet)
+}
+
+func GetPetFromEmail(c appengine.Context, userEmail string, petName string) (*datastore.Key, *Pet, error) {
+	if userEmail == "" {
+		return nil, nil, errors.New("user email cannot be nil.")
+	}
+
+	query := datastore.NewQuery(PetKind).Filter("email =", userEmail).Filter("name =", petName)
+
+	for t := query.Run(c); ; {
+		var pet Pet
+		key, err := t.Next(&pet)
+		if err == datastore.Done {
+			return nil, nil, nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		return key, &pet, nil
+	}
+
+	return nil, nil, nil
 }

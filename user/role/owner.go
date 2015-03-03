@@ -36,14 +36,14 @@ func AddOwner(c appengine.Context, owner *Owner) (*datastore.Key, error) {
 	return AddOwnerForUser(c, owner, userKey)
 }
 
-func UpdateOwner(c appengine.Context, ownerKey *datastore.Key, owner *Owner) (*datastore.Key, error) {
-	return datastore.Put(c, ownerKey, owner)
-}
-
 func AddOwnerForUser(c appengine.Context, owner *Owner, userKey *datastore.Key) (*datastore.Key, error) {
 	owner.userid = userKey.Encode()
 
 	ownerKey := datastore.NewIncompleteKey(c, OwnerKind, userKey)
+	return datastore.Put(c, ownerKey, owner)
+}
+
+func UpdateOwner(c appengine.Context, ownerKey *datastore.Key, owner *Owner) (*datastore.Key, error) {
 	return datastore.Put(c, ownerKey, owner)
 }
 

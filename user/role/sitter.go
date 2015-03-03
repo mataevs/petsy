@@ -42,14 +42,14 @@ func AddSitter(c appengine.Context, sitter *Sitter) (*datastore.Key, error) {
 	return AddSitterForUser(c, sitter, userKey)
 }
 
-func UpdateSitter(c appengine.Context, sitterKey *datastore.Key, sitter *Sitter) (*datastore.Key, error) {
-	return datastore.Put(c, sitterKey, sitter)
-}
-
 func AddSitterForUser(c appengine.Context, sitter *Sitter, userKey *datastore.Key) (*datastore.Key, error) {
 	sitter.userid = userKey.Encode()
 
 	sitterKey := datastore.NewIncompleteKey(c, SitterKind, userKey)
+	return datastore.Put(c, sitterKey, sitter)
+}
+
+func UpdateSitter(c appengine.Context, sitterKey *datastore.Key, sitter *Sitter) (*datastore.Key, error) {
 	return datastore.Put(c, sitterKey, sitter)
 }
 

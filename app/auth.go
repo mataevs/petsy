@@ -123,7 +123,8 @@ func register(c *Context, w io.Writer, r *http.Request) error {
 	}
 
 	w.Write([]byte("user created"))
-	return nil
+
+	return appReturn(http.StatusCreated)
 }
 
 func login(w http.ResponseWriter, r *http.Request) {

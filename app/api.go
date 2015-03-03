@@ -42,7 +42,6 @@ func getProfile(c *Context, w io.Writer, r *http.Request) error {
 
 // API endpoint for associating a sitter profile to a user.
 // Request - JSON format. Response - JSON.
-// TODO - return 201 Created in case of success.
 // TODO - return JSON responses.
 func addSitter(c *Context, w io.Writer, r *http.Request) (error, bool) {
 	var sitter role.Sitter
@@ -74,7 +73,7 @@ func addSitter(c *Context, w io.Writer, r *http.Request) (error, bool) {
 		return appErrorf(http.StatusInternalServerError, "%v", err), false
 	}
 
-	return nil, false
+	return appReturn(http.StatusCreated), false
 }
 
 func getSitter(c *Context, w io.Writer, r *http.Request) error {
@@ -170,7 +169,7 @@ func addOwner(c *Context, w io.Writer, r *http.Request) (error, bool) {
 		return appErrorf(http.StatusInternalServerError, "%v", err), false
 	}
 
-	return nil, false
+	return appReturn(http.StatusCreated), false
 }
 
 func getOwner(c *Context, w io.Writer, r *http.Request) error {

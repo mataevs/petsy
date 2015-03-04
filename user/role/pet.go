@@ -69,3 +69,34 @@ func GetPetFromEmail(c appengine.Context, userEmail string, petName string) (*da
 
 	return nil, nil, nil
 }
+
+func GetPetsFromEmail(c appengine.Context, userEmail string) (keys []*datastore.Key, pets []*Pet, err error) {
+	if userEmail == "" {
+		return nil, nil, errors.New("user email cannot be nil.")
+	}
+
+	ownerKey, _, err := GetOwnerFromEmail(c, userEmail)
+	if err != nil {
+		return nil, nil, err
+	}
+	if ownerKey == nil {
+		return nil, nil, errors.New("no owner profile defined for this email.")
+	}
+
+	query := datastore.NewQuery(PetKind).Ancestor(ownerKey)
+
+	for t := query.Run(c); ; {
+		var pet Pet
+		key, err := t.Next(&pet)
+		if err == datastore.Done {
+			return keys, pets, nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		keys = append(keys, key)
+		pets = append(pets, &pet)
+	}
+
+	return
+}

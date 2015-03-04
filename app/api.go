@@ -19,14 +19,17 @@ func init() {
 	api.Handle("/sitter", authReq(addSitter)).Methods("POST")
 	api.Handle("/sitter/{user}", appHandler(getSitter)).Methods("GET")
 	api.Handle("/sitter/{user}", authReq(updateSitter)).Methods("POST")
+	api.Handle("/sitters", appHandler(getSitters)).Methods("GET")
 
 	api.Handle("/owner/{user}", appHandler(getOwner)).Methods("GET")
 	api.Handle("/owner/{user}", authReq(updateOwner)).Methods("POST")
 	api.Handle("/owner", authReq(addOwner)).Methods("POST")
+	api.Handle("/owners", appHandler(getOwners)).Methods("GET")
 
+	api.Handle("/pet", authReq(addPet)).Methods("POST")
 	api.Handle("/owner/{user}/pet/{pet}", appHandler(getPet)).Methods("GET")
 	api.Handle("/owner/{user}/pet/{pet}", authReq(updatePet)).Methods("POST")
-	api.Handle("/pet", authReq(addPet)).Methods("POST")
+	api.Handle("/owner/{user}/pets", appHandler(getPets)).Methods("GET")
 
 	http.Handle("/api/", api)
 }
@@ -57,7 +60,7 @@ func addSitter(c *Context, w io.Writer, r *http.Request) (error, bool) {
 		return appErrorf(http.StatusInternalServerError, "Invalid sitter data: %v", err), false
 	}
 
-	// todo - add data from user (email, name)
+	sitter = sitter.AddCommonData(c.user)
 
 	// Check if there is another sitter profile for this user.
 	_, oldSitter, err := role.GetSitter(c.ctx, c.userKey)
@@ -99,6 +102,20 @@ func getSitter(c *Context, w io.Writer, r *http.Request) error {
 	return nil
 }
 
+func getSitters(c *Context, w io.Writer, r *http.Request) error {
+	_, sitters, err := role.GetSitters(c.ctx)
+	if err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(sitters); err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+
+	return nil
+}
+
 func updateSitter(c *Context, w io.Writer, r *http.Request) (error, bool) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
@@ -127,14 +144,15 @@ func updateSitter(c *Context, w io.Writer, r *http.Request) (error, bool) {
 	}
 
 	// Validate sitter struct fields.
-	if err := sitter.Validate(); err != nil {
+	if err := newSitter.Validate(); err != nil {
 		return appErrorf(http.StatusInternalServerError, "Invalid sitter data: %v", err), false
 	}
 
-	// todo - add data from user (email, name)
+	// Add data from user (email, name).
+	newSitter.AddCommonData(c.user)
 
 	// Update sitter.
-	if _, err := role.UpdateSitter(c.ctx, sitterKey, sitter); err != nil {
+	if _, err := role.UpdateSitter(c.ctx, sitterKey, &newSitter); err != nil {
 		return appErrorf(http.StatusInternalServerError, "error saving sitter: %v", err), false
 	}
 
@@ -155,7 +173,8 @@ func addOwner(c *Context, w io.Writer, r *http.Request) (error, bool) {
 		return appErrorf(http.StatusInternalServerError, "Invalid sitter data: %v", err), false
 	}
 
-	// todo - add data from user (email, name)
+	// Add data from user (email, name).
+	owner = owner.AddCommonData(c.user)
 
 	// Check if there is another sitter profile for this user.
 	_, oldOwner, err := role.GetOwner(c.ctx, c.userKey)
@@ -197,6 +216,20 @@ func getOwner(c *Context, w io.Writer, r *http.Request) error {
 	return nil
 }
 
+func getOwners(c *Context, w io.Writer, r *http.Request) error {
+	_, owners, err := role.GetOwners(c.ctx)
+	if err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(owners); err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+
+	return nil
+}
+
 func updateOwner(c *Context, w io.Writer, r *http.Request) (error, bool) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
@@ -225,14 +258,14 @@ func updateOwner(c *Context, w io.Writer, r *http.Request) (error, bool) {
 	}
 
 	// Validate owner struct fields.
-	if err := owner.Validate(); err != nil {
+	if err := newOwner.Validate(); err != nil {
 		return appErrorf(http.StatusInternalServerError, "Invalid owner data: %v", err), false
 	}
 
-	// todo - add data from user (email, name)
+	newOwner.AddCommonData(c.user)
 
 	// Update owner.
-	if _, err := role.UpdateOwner(c.ctx, ownerKey, owner); err != nil {
+	if _, err := role.UpdateOwner(c.ctx, ownerKey, &newOwner); err != nil {
 		return appErrorf(http.StatusInternalServerError, "error saving owner: %v", err), false
 	}
 
@@ -260,8 +293,6 @@ func addPet(c *Context, w io.Writer, r *http.Request) (error, bool) {
 	if ownerKey == nil {
 		return appErrorf(http.StatusNotFound, "no owner profile found for user."), false
 	}
-
-	// todo - add data from user (email, name)
 
 	// Check if there exists the pet in the datastore.
 	_, oldPet, err := role.GetPetFromEmail(c.ctx, c.user.Email, pet.Name)
@@ -304,6 +335,23 @@ func getPet(c *Context, w io.Writer, r *http.Request) error {
 	return nil
 }
 
+func getPets(c *Context, w io.Writer, r *http.Request) error {
+	vars := mux.Vars(r)
+	userEmail := vars["user"]
+
+	_, pets, err := role.GetPetsFromEmail(c.ctx, userEmail)
+	if err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(pets); err != nil {
+		return appErrorf(http.StatusInternalServerError, "%v", err)
+	}
+
+	return nil
+}
+
 func updatePet(c *Context, w io.Writer, r *http.Request) (error, bool) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
@@ -333,14 +381,12 @@ func updatePet(c *Context, w io.Writer, r *http.Request) (error, bool) {
 	}
 
 	// Validate pet struct fields.
-	if err := pet.Validate(); err != nil {
+	if err := newPet.Validate(); err != nil {
 		return appErrorf(http.StatusInternalServerError, "Invalid owner data: %v", err), false
 	}
 
-	// todo - add data from user (email, name)
-
 	// Update pet.
-	if _, err := role.UpdatePet(c.ctx, petKey, pet); err != nil {
+	if _, err := role.UpdatePet(c.ctx, petKey, &newPet); err != nil {
 		return appErrorf(http.StatusInternalServerError, "error saving pet: %v", err), false
 	}
 

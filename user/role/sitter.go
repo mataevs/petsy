@@ -30,6 +30,12 @@ func (s Sitter) Validate() error {
 	return nil
 }
 
+func (s Sitter) AddCommonData(user *petsyuser.User) Sitter {
+	s.Name = user.Name
+	s.Email = user.Email
+	return s
+}
+
 func AddSitter(c appengine.Context, sitter *Sitter) (*datastore.Key, error) {
 	userKey, _, err := petsyuser.GetUserByEmail(c, sitter.Email)
 	if err != nil {
@@ -95,4 +101,23 @@ func GetSitterFromEmail(c appengine.Context, userEmail string) (*datastore.Key, 
 	}
 
 	return nil, nil, nil
+}
+
+func GetSitters(c appengine.Context) (keys []*datastore.Key, sitters []*Sitter, err error) {
+	query := datastore.NewQuery(SitterKind)
+
+	for t := query.Run(c); ; {
+		var sitter Sitter
+		key, err := t.Next(&sitter)
+		if err == datastore.Done {
+			return keys, sitters, nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		keys = append(keys, key)
+		sitters = append(sitters, &sitter)
+	}
+
+	return
 }

@@ -1,3 +1,5 @@
+// +build appengine
+
 // Part of user package. Implements operations with user
 // structures on the Appengine's datastore.
 package user

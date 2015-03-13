@@ -4,16 +4,47 @@ import (
 	"net/http"
 )
 
-type Context interface{}
+type ContextMap map[string]interface{}
 
-type HandlerFunc func(c *Context, rw http.ResponseWriter, r *http.Request, next HandlerFunc)
+type Context interface {
+	Set(name string, v interface{})
+	Get(name string) (interface{}, bool)
+}
 
-func (hf HandlerFunc) Serve(c *Context, rw http.ResponseWriter, r *http.Request, next HandlerFunc) {
-	hf(c, rw, r, next)
+func (c *ContextMap) Set(name string, v interface{}) {
+	(*c)[name] = v
+}
+
+func (c *ContextMap) Get(name string) (interface{}, bool) {
+	v, ok := (*c)[name]
+	return v, ok
+}
+
+func NewContext() Context {
+	ctx := ContextMap(make(map[string]interface{}))
+	return &ctx
 }
 
 type Handler interface {
-	Serve(c *Context, rw http.ResponseWriter, r *http.Request, next HandlerFunc)
+	Serve(c Context, rw http.ResponseWriter, r *http.Request, next ContextHandler)
+}
+
+type ContextHandler func(c Context, rw http.ResponseWriter, r *http.Request)
+
+func (h ContextHandler) ServeContext(c Context, rw http.ResponseWriter, r *http.Request) {
+	h(c, rw, r)
+}
+
+func (h ContextHandler) Serve(c Context, rw http.ResponseWriter, r *http.Request, next ContextHandler) {
+	h.ServeContext(c, rw, r)
+	next(c, rw, r)
+}
+
+// HandlerFunc adapts a function to a Handler.
+type HandlerFunc func(c Context, rw http.ResponseWriter, r *http.Request, next ContextHandler)
+
+func (hf HandlerFunc) Serve(c Context, rw http.ResponseWriter, r *http.Request, next ContextHandler) {
+	hf(c, rw, r, next)
 }
 
 type StackElem struct {
@@ -21,28 +52,24 @@ type StackElem struct {
 	next *StackElem
 }
 
-func (se *StackElem) Serve(c *Context, rw http.ResponseWriter, r *http.Request, next HandlerFunc) {
-	se.Handler.Serve(c, rw, r, se.next.Serve)
-}
-
-func (se StackElem) ServeContextHTTP(c *Context, rw http.ResponseWriter, r *http.Request) {
+func (se *StackElem) Serve(c Context, rw http.ResponseWriter, r *http.Request) {
 	se.Handler.Serve(c, rw, r, se.next.Serve)
 }
 
 type Stack struct {
-	first StackElem
+	first *StackElem
 	last  *StackElem
 }
 
 func NewStack(first Handler, rest ...Handler) *Stack {
-	firstElem := StackElem{
+	firstElem := &StackElem{
 		Handler: first,
 		next:    nil,
 	}
 
 	stack := &Stack{
 		first: firstElem,
-		last:  &firstElem,
+		last:  firstElem,
 	}
 
 	for _, handler := range rest {
@@ -65,41 +92,12 @@ func (s *Stack) Add(handler Handler) *Stack {
 }
 
 func (s *Stack) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// c, e := NewContext(r)
-	// if e != nil {
-	// 	http.Error(w, e.Error(), http.StatusInternalServerError)
-	// }
+	ctx := NewContext()
 
-	// todo - catch and log error
-
-	// Create the buffer in which the response is buffered.
-	// buf := &bytes.Buffer{}
+	bufferedWriter := NewBufferedResponseWriter(w)
 
 	// Call the handler.
-	// s.first.ServeContextHTTP(nil, buf, r)
-	s.first.ServeContextHTTP(nil, w, r)
+	s.first.Serve(ctx, bufferedWriter, r)
 
-	// var code int
-	// var err error
-
-	// // Transform the error to appResult and fetch the code.
-	// if result == nil {
-	// 	code = http.StatusOK
-	// 	err = nil
-	// } else if res, ok := result.(*appResult); !ok {
-	// 	code = http.StatusInternalServerError
-	// 	err = errors.New("unable to cast error to appResult.")
-	// } else {
-	// 	code = res.Code
-	// 	err = res.error
-	// }
-
-	// w.WriteHeader(code)
-
-	// if err != nil {
-	// 	fmt.Fprint(w, err)
-	// 	c.ctx.Errorf(err.Error())
-	// } else {
-	// 	io.Copy(w, buf)
-	// }
+	bufferedWriter.Send()
 }

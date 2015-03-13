@@ -3,14 +3,11 @@
 package petsy
 
 import (
-	"bytes"
 	"errors"
-	"fmt"
-	"io"
-	"log"
 	"net/http"
 
 	"petsy/handler"
+	"petsy/handler/json"
 	"petsy/user"
 
 	"appengine"
@@ -21,145 +18,165 @@ import (
 
 var UnauthorizedError = errors.New("unauthorized operation")
 
-// appResult is a response with a HTTP response code.
-type appResult struct {
-	error
-	Code int
-}
+const (
+	AppengineContextName = "AppengineContext"
+	SessionName          = "Session"
+	UserName             = "User"
+	UserKeyName          = "UserKey"
+)
 
 type Context struct {
-	ctx     appengine.Context
-	session *sessions.Session
-	user    *user.User
-	userKey *datastore.Key
+	handler.Context
 }
 
-func NewContext(r *http.Request) (*Context, error) {
+func (c *Context) SetAppengineContext(ctx appengine.Context) {
+	c.Set(AppengineContextName, ctx)
+}
+
+func (c *Context) GetAppengineContext() (appengine.Context, bool) {
+	obj, ok := c.Get(AppengineContextName)
+	if !ok {
+		return nil, false
+	}
+
+	ctx, ok := obj.(appengine.Context)
+
+	return ctx, ok
+}
+
+func (c *Context) SetSession(sess *sessions.Session) {
+	c.Set(SessionName, sess)
+}
+
+func (c *Context) GetSession() (*sessions.Session, bool) {
+	obj, ok := c.Get(SessionName)
+	if !ok {
+		return nil, false
+	}
+
+	sess, ok := obj.(*sessions.Session)
+	return sess, ok
+}
+
+func (c *Context) SetUser(user *user.User) {
+	c.Set(UserName, user)
+}
+
+func (c *Context) GetUser() (*user.User, bool) {
+	obj, ok := c.Get(UserName)
+	if !ok {
+		return nil, false
+	}
+
+	user, ok := obj.(*user.User)
+	return user, ok
+}
+
+func (c *Context) SetUserKey(key *datastore.Key) {
+	c.Set(UserKeyName, key)
+}
+
+func (c *Context) GetUserKey() (*datastore.Key, bool) {
+	obj, ok := c.Get(UserKeyName)
+	if !ok {
+		return nil, false
+	}
+
+	key, ok := obj.(*datastore.Key)
+	return key, ok
+}
+
+func NewContext(c handler.Context, r *http.Request) (*Context, error) {
+	ctx := &Context{c}
+
 	sess, err := store.Get(r, "petsy")
 	if err != nil {
-		log.Println(err)
+		return nil, err
 	}
 
-	c := appengine.NewContext(r)
+	ctx.SetSession(sess)
 
-	ctx := &Context{
-		ctx:     c,
-		session: sess,
-	}
-	if err != nil {
-		return ctx, err
-	}
-
-	log.Println(sess.Values["user"])
-	log.Println(sess.IsNew)
+	appengineCtx := appengine.NewContext(r)
+	ctx.SetAppengineContext(appengineCtx)
 
 	if sess.Values["user"] == nil {
 		return ctx, nil
 	}
 	if email, ok := sess.Values["user"].(string); ok {
-		ctx.userKey, ctx.user, err = user.GetUserByEmail(c, email)
-		return ctx, err
+		key, u, err := user.GetUserByEmail(appengineCtx, email)
+		if err != nil {
+			return ctx, err
+		}
+
+		ctx.SetUser(u)
+		ctx.SetUserKey(key)
 	}
 
-	return ctx, errors.New("unexpected value in user session")
+	return ctx, nil
 }
 
-// appErrorf creates a new appResult encoding an error, given a response code and a message.
-func appErrorf(code int, format string, args ...interface{}) *appResult {
-	return &appResult{fmt.Errorf(format, args...), code}
-}
-
-// appReturn creates a new appResult storing an HTTP return code.
-func appReturn(code int) *appResult {
-	return &appResult{nil, code}
-}
-
-type appHandler func(c *Context, w io.Writer, r *http.Request) error
-
-func (h appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c, e := NewContext(r)
-	if e != nil {
-		http.Error(w, e.Error(), http.StatusInternalServerError)
-	}
-
-	// todo - catch and log error
-
-	// Create the buffer in which the response is buffered.
-	buf := &bytes.Buffer{}
-
-	// Call the handler.
-	result := h(c, buf, r)
-
-	var code int
-	var err error
-
-	// Transform the error to appResult and fetch the code.
-	if result == nil {
-		code = http.StatusOK
-		err = nil
-	} else if res, ok := result.(*appResult); !ok {
-		code = http.StatusInternalServerError
-		err = errors.New("unable to cast error to appResult.")
-	} else {
-		code = res.Code
-		err = res.error
-	}
-
-	w.WriteHeader(code)
+func BaseHandler(c handler.Context, rw http.ResponseWriter, r *http.Request, next handler.ContextHandler) {
+	ctx, err := NewContext(c, r)
 
 	if err != nil {
-		fmt.Fprint(w, err)
-		c.ctx.Errorf(err.Error())
-	} else {
-		io.Copy(w, buf)
-	}
-}
-
-// authReq checks that a user is logged in before executing the appHandler.
-// Returns true if the session must be saved.
-type authReq func(c *Context, w io.Writer, r *http.Request) (error, bool)
-
-// authReq implements http.Handler.
-func (h authReq) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c, e := NewContext(r)
-	if e != nil {
-		http.Error(w, e.Error(), http.StatusInternalServerError)
-	}
-
-	if c.user == nil {
-		http.Error(w, UnauthorizedError.Error(), http.StatusUnauthorized)
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Create the buffer in which the response is buffered.
-	buf := &bytes.Buffer{}
+	next(ctx, rw, r)
+}
 
-	result, saveSession := h(c, buf, r)
+func AuthHandler(c handler.Context, rw http.ResponseWriter, r *http.Request, next handler.ContextHandler) {
+	ctx := c.(*Context)
 
-	var code int
-	var err error
-
-	// Transform the error to appResult and fetch the code.
-	if result == nil {
-		code = http.StatusOK
-		err = nil
-	} else if res, ok := result.(*appResult); !ok {
-		code = http.StatusInternalServerError
-		err = errors.New("unable to cast error to appResult.")
-	} else {
-		code = res.Code
-		err = res.error
+	if user, ok := ctx.GetUser(); !ok || user == nil {
+		http.Error(rw, UnauthorizedError.Error(), http.StatusUnauthorized)
+		return
 	}
 
-	w.WriteHeader(code)
+	next(ctx, rw, r)
+}
 
-	if err != nil {
-		fmt.Fprint(w, err)
-		c.ctx.Errorf(err.Error())
-	} else {
-		if saveSession {
-			c.session.Save(r, w)
-		}
-		io.Copy(w, buf)
-	}
+func PetsyHandler(handlerFunc func(*Context, http.ResponseWriter, *http.Request)) *handler.Stack {
+	return handler.NewStack(
+		handler.HandlerFunc(BaseHandler),
+		handler.ContextHandler(
+			func(c handler.Context, rw http.ResponseWriter, r *http.Request) {
+				ctx := c.(*Context)
+				handlerFunc(ctx, rw, r)
+			}))
+}
+
+func PetsyAuthHandler(handlerFunc func(*Context, http.ResponseWriter, *http.Request)) *handler.Stack {
+	return handler.NewStack(
+		handler.HandlerFunc(BaseHandler),
+		handler.HandlerFunc(AuthHandler),
+		handler.ContextHandler(
+			func(c handler.Context, rw http.ResponseWriter, r *http.Request) {
+				ctx := c.(*Context)
+				handlerFunc(ctx, rw, r)
+			}))
+}
+
+func PetsyJsonHandler(handlerFunc func(*Context, http.ResponseWriter, *http.Request)) *handler.Stack {
+	return handler.NewStack(
+		handler.HandlerFunc(json.JsonResponse),
+		handler.HandlerFunc(BaseHandler),
+		handler.ContextHandler(
+			func(c handler.Context, rw http.ResponseWriter, r *http.Request) {
+				ctx := c.(*Context)
+				handlerFunc(ctx, rw, r)
+			}))
+}
+
+func PetsyAuthJsonHandler(handlerFunc func(*Context, http.ResponseWriter, *http.Request)) *handler.Stack {
+	return handler.NewStack(
+		handler.HandlerFunc(json.JsonResponse),
+		handler.HandlerFunc(BaseHandler),
+		handler.HandlerFunc(AuthHandler),
+		handler.ContextHandler(
+			func(c handler.Context, rw http.ResponseWriter, r *http.Request) {
+				ctx := c.(*Context)
+				handlerFunc(ctx, rw, r)
+			}))
 }

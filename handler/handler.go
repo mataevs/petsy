@@ -37,7 +37,10 @@ func (h ContextHandler) ServeContext(c Context, rw http.ResponseWriter, r *http.
 
 func (h ContextHandler) Serve(c Context, rw http.ResponseWriter, r *http.Request, next ContextHandler) {
 	h.ServeContext(c, rw, r)
-	next(c, rw, r)
+
+	if next != nil {
+		next(c, rw, r)
+	}
 }
 
 // HandlerFunc adapts a function to a Handler.

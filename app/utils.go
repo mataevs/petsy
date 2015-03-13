@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+
+	"petsy/handler/json"
 )
 
 func randomString(size int) (string, error) {
@@ -21,4 +23,20 @@ func randomString(size int) (string, error) {
 	}
 
 	return base64.URLEncoding.EncodeToString(buffer), nil
+}
+
+func JsonError(c *Context, code int, message string) {
+	err := &(struct {
+		code    int
+		message string
+	}{
+		code,
+		message,
+	})
+
+	JsonResponse(c, err)
+}
+
+func JsonResponse(c *Context, object interface{}) {
+	(*json.Context)(c).SetResponseObject(object)
 }

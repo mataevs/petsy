@@ -23,6 +23,7 @@ const (
 	SessionName          = "Session"
 	UserName             = "User"
 	UserKeyName          = "UserKey"
+	UpdateSessionName    = "UpdateSession"
 )
 
 type Context struct {
@@ -86,6 +87,20 @@ func (c *Context) GetUserKey() (*datastore.Key, bool) {
 	return key, ok
 }
 
+func (c *Context) SetUpdateSession(update bool) {
+	c.Set(UpdateSessionName, update)
+}
+
+func (c *Context) GetUpdateSession() (bool, bool) {
+	obj, ok := c.Get(UpdateSessionName)
+	if !ok {
+		return false, false
+	}
+
+	update, ok := obj.(bool)
+	return update, ok
+}
+
 func NewContext(c handler.Context, r *http.Request) (*Context, error) {
 	ctx := &Context{c}
 
@@ -135,6 +150,12 @@ func AuthHandler(c handler.Context, rw http.ResponseWriter, r *http.Request, nex
 	}
 
 	next(ctx, rw, r)
+
+	if update, ok := ctx.GetUpdateSession(); update && ok {
+		if session, ok := ctx.GetSession(); ok {
+			session.Save(r, rw)
+		}
+	}
 }
 
 func PetsyHandler(handlerFunc func(*Context, http.ResponseWriter, *http.Request)) *handler.Stack {

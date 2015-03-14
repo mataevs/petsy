@@ -22,25 +22,25 @@ func init() {
 	api.Handle("/sitter/{user}", PetsyAuthHandler(updateSitter)).Methods("POST")
 	api.Handle("/sitters", PetsyJsonHandler(getSitters)).Methods("GET")
 
-	// api.Handle("/owner/{user}", PetsyJsonHandler(getOwner)).Methods("GET")
-	// api.Handle("/owner/{user}", PetsyAuthHandler(updateOwner)).Methods("POST")
-	// api.Handle("/owner", PetsyAuthHandler(addOwner)).Methods("POST")
-	// api.Handle("/owners", PetsyJsonHandler(getOwners)).Methods("GET")
+	api.Handle("/owner/{user}", PetsyJsonHandler(getOwner)).Methods("GET")
+	api.Handle("/owner/{user}", PetsyAuthHandler(updateOwner)).Methods("POST")
+	api.Handle("/owner", PetsyAuthHandler(addOwner)).Methods("POST")
+	api.Handle("/owners", PetsyJsonHandler(getOwners)).Methods("GET")
 
-	// api.Handle("/pet", PetsyAuthHandler(addPet)).Methods("POST")
-	// api.Handle("/owner/{user}/pet/{pet}", PetsyJsonHandler(getPet)).Methods("GET")
-	// api.Handle("/owner/{user}/pet/{pet}", PetsyAuthHandler(updatePet)).Methods("POST")
-	// api.Handle("/owner/{user}/pets", PetsyJsonHandler(getPets)).Methods("GET")
+	api.Handle("/pet", PetsyAuthHandler(addPet)).Methods("POST")
+	api.Handle("/owner/{user}/pet/{pet}", PetsyJsonHandler(getPet)).Methods("GET")
+	api.Handle("/owner/{user}/pet/{pet}", PetsyAuthHandler(updatePet)).Methods("POST")
+	api.Handle("/owner/{user}/pets", PetsyJsonHandler(getPets)).Methods("GET")
 
 	http.Handle("/api/", api)
 }
 
-func updateProfile(c *Context, w http.ResponseWriter, r *http.Request) {
+func getProfile(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 	JsonError(c, 101, "update profile - not implemented")
 }
 
-func getProfile(c *Context, w http.ResponseWriter, r *http.Request) {
+func updateProfile(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 	JsonError(c, 101, "update profile - not implemented")
 }
@@ -58,7 +58,7 @@ func addSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get sitter struct from JSON request.
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&sitter); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		JsonError(c, 101, "error decoding data: "+err.Error())
 		return
 	}
@@ -164,7 +164,7 @@ func updateSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get sitter struct from JSON request.
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&newSitter); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		JsonError(c, 101, "error decoding sitter: "+err.Error())
 		return
 	}
@@ -231,204 +231,249 @@ func addOwner(c *Context, w http.ResponseWriter, r *http.Request) {
 		JsonError(c, 101, "Error adding the owner profile: "+err.Error())
 		return
 	}
+
+	w.WriteHeader(http.StatusCreated)
 }
 
-// func getOwner(c *Context, w http.ResponseWriter, r *http.Request) {
-// 	// Get user email from request url.
-// 	vars := mux.Vars(r)
-// 	userEmail := vars["user"]
+func getOwner(c *Context, w http.ResponseWriter, r *http.Request) {
+	// Get user email from request url.
+	vars := mux.Vars(r)
+	userEmail := vars["user"]
 
-// 	// Get owner from datastore.
-// 	_, owner, err := role.GetOwnerFromEmail(c.ctx, userEmail)
-// 	if err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err)
-// 	}
-// 	if owner == nil {
-// 		return appErrorf(http.StatusNotFound, "This owner does not exist.")
-// 	}
+	ctx, _ := c.GetAppengineContext()
 
-// 	// Encode owner to json.
-// 	enc := json.NewEncoder(w)
-// 	if err := enc.Encode(owner); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err)
-// 	}
+	// Get owner from datastore.
+	_, owner, err := role.GetOwnerFromEmail(ctx, userEmail)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting owner profile: "+err.Error())
+		return
+	}
+	if owner == nil {
+		w.WriteHeader(http.StatusNotFound)
+		JsonError(c, 101, "This owner does not exist.")
+		return
+	}
 
-// 	return nil
-// }
+	JsonResponse(c, owner)
+}
 
-// func getOwners(c *Context, w http.ResponseWriter, r *http.Request) {
-// 	_, owners, err := role.GetOwners(c.ctx)
-// 	if err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err)
-// 	}
+func getOwners(c *Context, w http.ResponseWriter, r *http.Request) {
+	ctx, _ := c.GetAppengineContext()
 
-// 	enc := json.NewEncoder(w)
-// 	if err := enc.Encode(owners); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err)
-// 	}
+	_, owners, err := role.GetOwners(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting owners: %v"+err.Error())
+		return
+	}
 
-// 	return nil
-// }
+	JsonResponse(c, owners)
+}
 
-// func updateOwner(c *Context, w http.ResponseWriter, r *http.Request) {
-// 	// Get user email from request url.
-// 	vars := mux.Vars(r)
-// 	userEmail := vars["user"]
+func updateOwner(c *Context, w http.ResponseWriter, r *http.Request) {
+	// Get user email from request url.
+	vars := mux.Vars(r)
+	userEmail := vars["user"]
 
-// 	// Allow update only on the logged user.
-// 	if userEmail != c.user.Email {
-// 		return appErrorf(http.StatusForbidden, "Not allowed to update another user."), false
-// 	}
+	ctx, _ := c.GetAppengineContext()
+	user, _ := c.GetUser()
 
-// 	// Get owner from datastore.
-// 	ownerKey, owner, err := role.GetOwnerFromEmail(c.ctx, userEmail)
-// 	if err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err), false
-// 	}
-// 	if owner == nil {
-// 		return appErrorf(http.StatusNotFound, "This owner does not exist."), false
-// 	}
+	// Allow update only on the logged user.
+	if userEmail != user.Email {
+		w.WriteHeader(http.StatusForbidden)
+		JsonError(c, 101, "Not allowed to update another user.")
+		return
+	}
 
-// 	var newOwner role.Owner
+	// Get owner from datastore.
+	ownerKey, owner, err := role.GetOwnerFromEmail(ctx, userEmail)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting owner data: "+err.Error())
+		return
+	}
+	if owner == nil {
+		w.WriteHeader(http.StatusNotFound)
+		JsonError(c, 101, "Owner profile does not exist.")
+		return
+	}
 
-// 	// Get owner struct from JSON request.
-// 	dec := json.NewDecoder(r.Body)
-// 	if err := dec.Decode(&newOwner); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "error decoding: %v", err), false
-// 	}
+	var newOwner role.Owner
 
-// 	// Validate owner struct fields.
-// 	if err := newOwner.Validate(); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "Invalid owner data: %v", err), false
-// 	}
+	// Get owner struct from JSON request.
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&newOwner); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "error decoding owner data: "+err.Error())
+		return
+	}
 
-// 	newOwner.AddCommonData(c.user)
+	// Validate owner struct fields.
+	if err := newOwner.Validate(); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "invalid owner data: "+err.Error())
+		return
+	}
 
-// 	// Update owner.
-// 	if _, err := role.UpdateOwner(c.ctx, ownerKey, &newOwner); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "error saving owner: %v", err), false
-// 	}
+	newOwner.AddCommonData(user)
 
-// 	return nil, false
-// }
+	// Update owner.
+	if _, err := role.UpdateOwner(ctx, ownerKey, &newOwner); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error saving owner: "+err.Error())
+		return
+	}
+}
 
-// func addPet(c *Context, w http.ResponseWriter, r *http.Request) {
-// 	var pet role.Pet
+func addPet(c *Context, w http.ResponseWriter, r *http.Request) {
+	ctx, _ := c.GetAppengineContext()
+	user, _ := c.GetUser()
+	userKey, _ := c.GetUserKey()
 
-// 	// Get pet struct from JSON request.
-// 	dec := json.NewDecoder(r.Body)
-// 	if err := dec.Decode(&pet); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "error decoding: %v", err), false
-// 	}
+	var pet role.Pet
 
-// 	// Validate pet struct fields.
-// 	if err := pet.Validate(); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "Invalid pet data: %v", err), false
-// 	}
+	// Get pet struct from JSON request.
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&pet); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "error decoding pet data:"+err.Error())
+		return
+	}
 
-// 	ownerKey, _, err := role.GetOwner(c.ctx, c.userKey)
-// 	if err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "error getting owner entry: %v", err), false
-// 	}
-// 	if ownerKey == nil {
-// 		return appErrorf(http.StatusNotFound, "no owner profile found for user."), false
-// 	}
+	// Validate pet struct fields.
+	if err := pet.Validate(); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "invalid pet data: "+err.Error())
+		return
+	}
 
-// 	// Check if there exists the pet in the datastore.
-// 	_, oldPet, err := role.GetPetFromEmail(c.ctx, c.user.Email, pet.Name)
-// 	if err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err), false
-// 	}
-// 	if oldPet != nil {
-// 		return appErrorf(http.StatusNotFound, "A pet with the same name already exists."), false
-// 	}
+	// Check the owner profile of the pet owner
+	ownerKey, _, err := role.GetOwner(ctx, userKey)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting owner entry: "+err.Error())
+		return
+	}
+	if ownerKey == nil {
+		w.WriteHeader(http.StatusNotFound)
+		JsonError(c, 101, "no owner profile found for user.")
+		return
+	}
 
-// 	// Add the pet profile.
-// 	if _, err := role.AddPetForOwner(c.ctx, &pet, c.userKey); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err), false
-// 	}
+	// Check if there exists the pet in the datastore.
+	_, oldPet, err := role.GetPetFromEmail(ctx, user.Email, pet.Name)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error checking pet profile: "+err.Error())
+		return
+	}
+	if oldPet != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "a pet with the same name already exists.")
+		return
+	}
 
-// 	return appReturn(http.StatusCreated), false
-// }
+	// Add the pet profile.
+	if _, err := role.AddPetForOwner(ctx, &pet, userKey); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error storing pet profile: "+err.Error())
+		return
+	}
 
-// func getPet(c *Context, w http.ResponseWriter, r *http.Request) {
-// 	// Get user email from request url.
-// 	vars := mux.Vars(r)
-// 	userEmail := vars["user"]
-// 	petName := vars["pet"]
+	w.WriteHeader(http.StatusCreated)
+}
 
-// 	// Get pet from datastore.
-// 	_, pet, err := role.GetPetFromEmail(c.ctx, userEmail, petName)
-// 	if err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err)
-// 	}
-// 	if pet == nil {
-// 		return appErrorf(http.StatusNotFound, "This pet does not exist.")
-// 	}
+func getPet(c *Context, w http.ResponseWriter, r *http.Request) {
+	// Get user email from request url.
+	vars := mux.Vars(r)
+	userEmail := vars["user"]
+	petName := vars["pet"]
 
-// 	// Encode pet to json.
-// 	enc := json.NewEncoder(w)
-// 	if err := enc.Encode(pet); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err)
-// 	}
+	ctx, _ := c.GetAppengineContext()
 
-// 	return nil
-// }
+	// Get pet from datastore.
+	_, pet, err := role.GetPetFromEmail(ctx, userEmail, petName)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting pet: "+err.Error())
+		return
+	}
+	if pet == nil {
+		w.WriteHeader(http.StatusNotFound)
+		JsonError(c, 101, "pet profile does not exist.")
+		return
+	}
 
-// func getPets(c *Context, w http.ResponseWriter, r *http.Request) {
-// 	vars := mux.Vars(r)
-// 	userEmail := vars["user"]
+	JsonResponse(c, pet)
+}
 
-// 	_, pets, err := role.GetPetsFromEmail(c.ctx, userEmail)
-// 	if err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err)
-// 	}
+func getPets(c *Context, w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userEmail := vars["user"]
 
-// 	enc := json.NewEncoder(w)
-// 	if err := enc.Encode(pets); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err)
-// 	}
+	ctx, _ := c.GetAppengineContext()
 
-// 	return nil
-// }
+	_, pets, err := role.GetPetsFromEmail(ctx, userEmail)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting pet profiles: "+err.Error())
+		return
+	}
 
-// func updatePet(c *Context, w http.ResponseWriter, r *http.Request) {
-// 	// Get user email from request url.
-// 	vars := mux.Vars(r)
-// 	userEmail := vars["user"]
-// 	petName := vars["pet"]
+	JsonResponse(c, pets)
+}
 
-// 	// Allow update only on the logged user.
-// 	if userEmail != c.user.Email {
-// 		return appErrorf(http.StatusForbidden, "Not allowed to update another user."), false
-// 	}
+func updatePet(c *Context, w http.ResponseWriter, r *http.Request) {
+	// Get user email from request url.
+	vars := mux.Vars(r)
+	userEmail := vars["user"]
+	petName := vars["pet"]
 
-// 	// Get pet from datastore.
-// 	petKey, pet, err := role.GetPetFromEmail(c.ctx, userEmail, petName)
-// 	if err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "%v", err), false
-// 	}
-// 	if pet == nil {
-// 		return appErrorf(http.StatusNotFound, "This pet does not exist."), false
-// 	}
+	ctx, _ := c.GetAppengineContext()
+	user, _ := c.GetUser()
 
-// 	var newPet role.Pet
+	// Allow update only on the logged user.
+	if userEmail != user.Email {
+		w.WriteHeader(http.StatusForbidden)
+		JsonError(c, 101, "Not allowed to update another user.")
+		return
+	}
 
-// 	// Get pet struct from JSON request.
-// 	dec := json.NewDecoder(r.Body)
-// 	if err := dec.Decode(&newPet); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "error decoding: %v", err), false
-// 	}
+	// Get pet from datastore.
+	petKey, pet, err := role.GetPetFromEmail(ctx, userEmail, petName)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting pet profile: "+err.Error())
+		return
+	}
+	if pet == nil {
+		w.WriteHeader(http.StatusNotFound)
+		JsonError(c, 101, "this pet profile does not exist")
+		return
+	}
 
-// 	// Validate pet struct fields.
-// 	if err := newPet.Validate(); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "Invalid owner data: %v", err), false
-// 	}
+	var newPet role.Pet
 
-// 	// Update pet.
-// 	if _, err := role.UpdatePet(c.ctx, petKey, &newPet); err != nil {
-// 		return appErrorf(http.StatusInternalServerError, "error saving pet: %v", err), false
-// 	}
+	// Get pet struct from JSON request.
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&newPet); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "error decoding sent pet profile")
+		return
+	}
 
-// 	return nil, false
-// }
+	// Validate pet struct fields.
+	if err := newPet.Validate(); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "invalid pet data"+err.Error())
+		return
+	}
+
+	// Update pet.
+	if _, err := role.UpdatePet(ctx, petKey, &newPet); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error updating pet profile: "+err.Error())
+		return
+	}
+}

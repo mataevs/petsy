@@ -179,6 +179,7 @@ func logout(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("You have been logged out."))
 
 	// todo
+	c.SetUpdateSession(true)
 }
 
 func loginHandler(providerName string) http.HandlerFunc {

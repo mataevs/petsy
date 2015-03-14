@@ -59,6 +59,11 @@ func (se *StackElem) Serve(c Context, rw http.ResponseWriter, r *http.Request) {
 	se.Handler.Serve(c, rw, r, se.next.Serve)
 }
 
+var voidElem = &StackElem{
+	HandlerFunc(func(c Context, rw http.ResponseWriter, r *http.Request, next ContextHandler) {}),
+	&StackElem{},
+}
+
 type Stack struct {
 	first *StackElem
 	last  *StackElem
@@ -67,7 +72,7 @@ type Stack struct {
 func NewStack(first Handler, rest ...Handler) *Stack {
 	firstElem := &StackElem{
 		Handler: first,
-		next:    nil,
+		next:    voidElem,
 	}
 
 	stack := &Stack{
@@ -85,7 +90,7 @@ func NewStack(first Handler, rest ...Handler) *Stack {
 func (s *Stack) Add(handler Handler) *Stack {
 	elem := &StackElem{
 		Handler: handler,
-		next:    nil,
+		next:    voidElem,
 	}
 
 	s.last.next = elem

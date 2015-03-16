@@ -1,11 +1,14 @@
+// +build appengine
 package role
 
 import (
 	"time"
+
+	"appengine/datastore"
 )
 
 type commonInfo struct {
-	userid    string
+	UserKey   *datastore.Key
 	Name      string
 	Email     string
 	Page      string

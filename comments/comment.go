@@ -15,6 +15,8 @@ const (
 	CommentKind = "comments"
 )
 
+// A Comment is a descendant of another entity. Thus, a comment has an ancestor key of another entity.
+// There can be a hierarchy of comments (a comment can have a parent).
 type Comment struct {
 	Author    *user.User `datastore:"-"`
 	Email     string
@@ -41,6 +43,34 @@ func AddComment(c appengine.Context, comment *Comment, commentedEntityKey *datas
 
 func UpdateComment(c appengine.Context, comment *Comment, commentKey *datastore.Key) (*datastore.Key, error) {
 	return datastore.Put(c, commentKey, comment)
+}
+
+func PopulateAuthorsForComments(c appengine.Context, comments []*Comment) ([]*Comment, error) {
+	authors := make(map[*datastore.Key]bool)
+
+	// Mark the unique author keys.
+	for _, comment := range comments {
+		authors[comment.AuthorKey] = true
+	}
+
+	authorsUsers := make(map[*datastore.Key]*user.User)
+
+	// Fetch the user profile for each author key.
+	for authorKey, _ := range authors {
+		var u user.User
+		err := datastore.Get(c, authorKey, &u)
+		if err != nil {
+			return nil, err
+		}
+		authorsUsers[authorKey] = &u
+	}
+
+	// Fill in the user profile to each comment.
+	for _, comment := range comments {
+		comment.Author = authorsUsers[comment.AuthorKey]
+	}
+
+	return comments, nil
 }
 
 func GetCommentsForUser(c appengine.Context, email string) (keys []*datastore.Key, comments []*Comment, err error) {
@@ -81,4 +111,26 @@ func GetCommentsForEntity(c appengine.Context, commentedEntityKey *datastore.Key
 
 	// todo - fill in the author and parent pointers
 	return
+}
+
+func GetCommentsTreeForEntity(c appengine.Context, commentedEntityKey *datastore.Key) ([]*datastore.Key, []*Comment, error) {
+
+	keys, comments, err := GetCommentsForEntity(c, commentedEntityKey)
+	if err != nil {
+		return keys, comments, err
+	}
+
+	// Create a map (key, Comment)
+	commentsKeysMap := make(map[*datastore.Key]*Comment)
+	for i, key := range keys {
+		commentsKeysMap[key] = comments[i]
+	}
+
+	for _, comment := range comments {
+		if comment.ParentKey != nil {
+			comment.Parent = commentsKeysMap[comment.ParentKey]
+		}
+	}
+
+	return keys, comments, err
 }

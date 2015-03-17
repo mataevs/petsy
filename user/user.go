@@ -19,7 +19,6 @@ type Provider struct {
 type User struct {
 	Name      string `datastore:"name"`
 	Email     string `datastore:"email"`
-	AvatarURL string `datastore:"avatar,noindex"`
 	Active    bool
 	Hash      []byte `datastore:"hash,noindex"`
 	Salt      []byte `datastore:"salt,noindex"`

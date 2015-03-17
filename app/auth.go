@@ -1,8 +1,9 @@
+// +build appengine
+
 package petsy
 
 import (
 	"html/template"
-	"io"
 	_ "log"
 	"net/http"
 	"time"
@@ -50,80 +51,86 @@ func init() {
 	auth.Handle("/google/login", loginHandler("google"))
 	auth.Handle("/google/callback", callbackHandler("google"))
 
-	auth.Handle("/register", appHandler(showRegisterPage)).Methods("GET")
-	auth.Handle("/register", appHandler(register)).Methods("POST")
+	auth.Handle("/register", PetsyHandler(showRegisterPage)).Methods("GET")
+	auth.Handle("/register", PetsyHandler(register)).Methods("POST")
 
-	auth.Handle("/login", appHandler(showLoginPage)).Methods("GET")
+	auth.Handle("/login", PetsyHandler(showLoginPage)).Methods("GET")
 	auth.Handle("/login", http.HandlerFunc(login)).Methods("POST")
 
-	auth.Handle("/logout", authReq(showLogoutPage)).Methods("GET")
-	auth.Handle("/logout", authReq(logout)).Methods("POST")
+	auth.Handle("/logout", PetsyAuthHandler(showLogoutPage)).Methods("GET")
+	auth.Handle("/logout", PetsyAuthHandler(logout)).Methods("POST")
 
 	http.Handle("/auth/", auth)
 }
 
-func showRegisterPage(c *Context, w io.Writer, r *http.Request) error {
+func showRegisterPage(c *Context, w http.ResponseWriter, r *http.Request) {
 	t, _ := template.ParseFiles("templates/register.html")
 	t.Execute(w, nil)
-
-	return nil
 }
 
-func showLoginPage(c *Context, w io.Writer, r *http.Request) error {
+func showLoginPage(c *Context, w http.ResponseWriter, r *http.Request) {
 	t, _ := template.ParseFiles("templates/login.html")
 	t.Execute(w, nil)
-
-	return nil
 }
 
-func showLogoutPage(c *Context, w io.Writer, r *http.Request) (err error, saveCookie bool) {
+func showLogoutPage(c *Context, w http.ResponseWriter, r *http.Request) {
 	t, _ := template.ParseFiles("templates/logout.html")
 	t.Execute(w, nil)
-	return
 }
 
-func register(c *Context, w io.Writer, r *http.Request) error {
+func register(c *Context, w http.ResponseWriter, r *http.Request) {
 	name := r.PostFormValue("name")
 	email := r.PostFormValue("email")
 	pass := r.PostFormValue("password")
 
 	if IsEmpty(name) {
-		return appErrorf(http.StatusForbidden, "Name cannot be empty.")
+		http.Error(w, "Name cannot be empty.", http.StatusForbidden)
+		return
 	}
 	if IsEmpty(email) {
-		return appErrorf(http.StatusForbidden, "Email cannot be empty.")
+		http.Error(w, "Email cannot be empty.", http.StatusForbidden)
+		return
 	}
 	if IsEmpty(pass) {
-		return appErrorf(http.StatusForbidden, "Password cannot be empty.")
+		http.Error(w, "Password cannot be empty.", http.StatusForbidden)
+		return
 	}
 
+	ctx, _ := c.GetAppengineContext()
+
 	// Check if this username is already taken.
-	_, user, err := petsyuser.GetUserByEmail(c.ctx, email)
+	_, user, err := petsyuser.GetUserByEmail(ctx, email)
 	if err != nil {
-		return appErrorf(http.StatusInternalServerError, "%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	if user != nil {
-		return appErrorf(http.StatusForbidden, "This email already exists.")
+		http.Error(w, "There is another user registered with this email.", http.StatusInternalServerError)
+		return
 	}
 
 	// Create the user.
 	u, err := petsyuser.NewUser(name, email)
 	if err != nil {
-		return appErrorf(http.StatusInternalServerError, "%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	u.SetPassword(pass)
 
 	// Add the user to the datastore.
-	if _, err := petsyuser.AddUser(c.ctx, u); err != nil {
-		return appErrorf(http.StatusInternalServerError, "%v", err)
+	if _, err := petsyuser.AddUser(ctx, u); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	if err := generateActivationLink(c, name, email); err != nil {
-		return appErrorf(http.StatusInternalServerError, "%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Write([]byte("user created"))
-	return nil
+
+	w.WriteHeader(http.StatusCreated)
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +164,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = createUserSession(user, w, r); err != nil {
+	if err = createUserSession(user.Email, w, r); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -165,13 +172,14 @@ func login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func logout(c *Context, w io.Writer, r *http.Request) (err error, saveSession bool) {
-	c.session.Options.MaxAge = -1
+func logout(c *Context, w http.ResponseWriter, r *http.Request) {
+	session, _ := c.GetSession()
+	session.Options.MaxAge = -1
 
 	w.Write([]byte("You have been logged out."))
 
-	saveSession = true
-	return
+	// todo
+	c.SetUpdateSession(true)
 }
 
 func loginHandler(providerName string) http.HandlerFunc {
@@ -235,7 +243,7 @@ func callbackHandler(providerName string) http.HandlerFunc {
 			return
 		}
 
-		if err = createUserSession(user, w, r); err != nil {
+		if err = createUserSession(user.Email, w, r); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -272,15 +280,14 @@ func addOrUpdateUser(c appengine.Context, name, email, provider, providerId stri
 	return user, nil
 }
 
-func createUserSession(user *petsyuser.User, w http.ResponseWriter, r *http.Request) error {
-	c, err := NewContext(r)
+func createUserSession(email string, w http.ResponseWriter, r *http.Request) error {
+	session, err := store.Get(r, "petsy")
 	if err != nil {
 		return err
 	}
 
-	c.session.Values["user"] = user.Email
-	c.session.Values["login"] = time.Now().Unix()
-	c.user = user
+	session.Values["user"] = email
+	session.Values["login"] = time.Now().Unix()
 
-	return c.session.Save(r, w)
+	return session.Save(r, w)
 }

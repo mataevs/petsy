@@ -45,7 +45,7 @@ func UpdateComment(c appengine.Context, comment *Comment, commentKey *datastore.
 	return datastore.Put(c, commentKey, comment)
 }
 
-func PopulateAuthorsForComments(c appengine.Context, comments []*Comment) ([]*Comment, error) {
+func getAuthorsForComments(c appengine.Context, comments []*Comment) ([]*Comment, error) {
 	authors := make(map[*datastore.Key]bool)
 
 	// Mark the unique author keys.
@@ -73,9 +73,7 @@ func PopulateAuthorsForComments(c appengine.Context, comments []*Comment) ([]*Co
 	return comments, nil
 }
 
-func GetCommentsForUser(c appengine.Context, email string) (keys []*datastore.Key, comments []*Comment, err error) {
-	query := datastore.NewQuery(CommentKind)
-
+func runGetCommentsQuery(c appengine.Context, query *datastore.Query) (keys []*datastore.Key, comments []*Comment, err error) {
 	for t := query.Run(c); ; {
 		var comment Comment
 		key, err := t.Next(&comment)
@@ -89,28 +87,31 @@ func GetCommentsForUser(c appengine.Context, email string) (keys []*datastore.Ke
 		comments = append(comments, &comment)
 	}
 
-	// todo - fill in the author and parent pointers
+	comments, err = getAuthorsForComments(c, comments)
+	if err != nil {
+		return nil, nil, err
+	}
 	return
 }
 
+func GetCommentsForEmail(c appengine.Context, email string) (keys []*datastore.Key, comments []*Comment, err error) {
+	query := datastore.NewQuery(CommentKind).Order("-Date")
+	return runGetCommentsQuery(c, query)
+}
+
+func GetCommentsForEmailPaged(c appengine.Context, email string, offset, limit int) (keys []*datastore.Key, comments []*Comment, err error) {
+	query := datastore.NewQuery(CommentKind).Order("-Date").Offset(offset).Limit(limit)
+	return runGetCommentsQuery(c, query)
+}
+
 func GetCommentsForEntity(c appengine.Context, commentedEntityKey *datastore.Key) (keys []*datastore.Key, comments []*Comment, err error) {
-	query := datastore.NewQuery(CommentKind).Ancestor(commentedEntityKey)
+	query := datastore.NewQuery(CommentKind).Ancestor(commentedEntityKey).Order("Date")
+	return runGetCommentsQuery(c, query)
+}
 
-	for t := query.Run(c); ; {
-		var comment Comment
-		key, err := t.Next(&comment)
-		if err == datastore.Done {
-			break
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-		keys = append(keys, key)
-		comments = append(comments, &comment)
-	}
-
-	// todo - fill in the author and parent pointers
-	return
+func GetCommentsForEntityPaged(c appengine.Context, commentedEntityKey *datastore.Key, offset, limit int) (keys []*datastore.Key, comments []*Comment, err error) {
+	query := datastore.NewQuery(CommentKind).Ancestor(commentedEntityKey).Order("Date").Offset(offset).Limit(limit)
+	return runGetCommentsQuery(c, query)
 }
 
 func GetCommentsTreeForEntity(c appengine.Context, commentedEntityKey *datastore.Key) ([]*datastore.Key, []*Comment, error) {

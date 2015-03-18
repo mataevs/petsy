@@ -3,7 +3,6 @@
 package petsy
 
 import (
-	"html/template"
 	_ "log"
 	"net/http"
 	"time"
@@ -51,31 +50,13 @@ func init() {
 	auth.Handle("/google/login", loginHandler("google"))
 	auth.Handle("/google/callback", callbackHandler("google"))
 
-	auth.Handle("/register", PetsyHandler(showRegisterPage)).Methods("GET")
 	auth.Handle("/register", PetsyHandler(register)).Methods("POST")
 
-	auth.Handle("/login", PetsyHandler(showLoginPage)).Methods("GET")
 	auth.Handle("/login", http.HandlerFunc(login)).Methods("POST")
 
-	auth.Handle("/logout", PetsyAuthHandler(showLogoutPage)).Methods("GET")
 	auth.Handle("/logout", PetsyAuthHandler(logout)).Methods("POST")
 
 	http.Handle("/auth/", auth)
-}
-
-func showRegisterPage(c *Context, w http.ResponseWriter, r *http.Request) {
-	t, _ := template.ParseFiles("templates/register.html")
-	t.Execute(w, nil)
-}
-
-func showLoginPage(c *Context, w http.ResponseWriter, r *http.Request) {
-	t, _ := template.ParseFiles("templates/login.html")
-	t.Execute(w, nil)
-}
-
-func showLogoutPage(c *Context, w http.ResponseWriter, r *http.Request) {
-	t, _ := template.ParseFiles("templates/logout.html")
-	t.Execute(w, nil)
 }
 
 func register(c *Context, w http.ResponseWriter, r *http.Request) {

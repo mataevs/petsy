@@ -17,6 +17,7 @@ type Provider struct {
 
 // User stores a user of the application, login-wise.
 type User struct {
+	Id        string
 	Name      string `datastore:"name"`
 	Email     string `datastore:"email"`
 	Active    bool

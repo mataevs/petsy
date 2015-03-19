@@ -12,6 +12,7 @@ import (
 
 type Owner struct {
 	commonInfo
+	Id          string
 	Description string
 	Rating      string
 	Pets        []Pet
@@ -47,14 +48,38 @@ func AddOwnerForUser(c appengine.Context, owner *Owner, userKey *datastore.Key) 
 	owner.UserKey = userKey
 
 	ownerKey := datastore.NewIncompleteKey(c, OwnerKind, userKey)
+
+	owner.Id = ownerKey.Encode()
+
 	return datastore.Put(c, ownerKey, owner)
 }
 
 func UpdateOwner(c appengine.Context, ownerKey *datastore.Key, owner *Owner) (*datastore.Key, error) {
+
+	owner.Id = ownerKey.Encode()
+
 	return datastore.Put(c, ownerKey, owner)
 }
 
-func GetOwner(c appengine.Context, userKey *datastore.Key) (*datastore.Key, *Owner, error) {
+func GetOwner(c appengine.Context, encodedId string) (*datastore.Key, *Owner, error) {
+	var owner Owner
+
+	key, err := datastore.DecodeKey(encodedId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := datastore.Get(c, key, &owner); err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	return key, &owner, nil
+}
+
+func GetOwnerForUser(c appengine.Context, userKey *datastore.Key) (*datastore.Key, *Owner, error) {
 	if userKey == nil {
 		return nil, nil, errors.New("user key cannot be nil.")
 	}

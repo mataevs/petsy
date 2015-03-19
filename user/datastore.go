@@ -21,7 +21,27 @@ func AddUser(c appengine.Context, user *User) (*datastore.Key, error) {
 	}
 	userKey := datastore.NewIncompleteKey(c, UserKind, nil)
 
+	user.Id = userKey.Encode()
+
 	return datastore.Put(c, userKey, user)
+}
+
+func GetUser(c appengine.Context, encodedId string) (*datastore.Key, *User, error) {
+	var user User
+
+	key, err := datastore.DecodeKey(encodedId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := datastore.Get(c, key, &user); err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	return key, &user, nil
 }
 
 // GetUserByEmail returns from the datastorethe user associated with the provided email.
@@ -69,6 +89,8 @@ func UpdateUser(c appengine.Context, prevEmail string, user *User) (*datastore.K
 	if key == nil {
 		return nil, errors.New("no user with email " + prevEmail + " found for updating.")
 	}
+
+	user.Id = key.Encode()
 
 	return datastore.Put(c, key, user)
 }

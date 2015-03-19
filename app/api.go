@@ -91,7 +91,7 @@ func addSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if there is another sitter profile for this user.
-	_, oldSitter, err := role.GetSitter(ctx, userKey)
+	_, oldSitter, err := role.GetSitterForUser(ctx, userKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error decoding data: "+err.Error())
@@ -223,7 +223,7 @@ func addOwner(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if there is another owner profile for this user.
-	_, oldOwner, err := role.GetOwner(ctx, userKey)
+	_, oldOwner, err := role.GetOwnerForUser(ctx, userKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error checking existing owner profile: "+err.Error())
@@ -357,7 +357,7 @@ func addPet(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if there exists the pet in the datastore.
-	_, oldPet, err := role.GetPetFromEmail(ctx, user.Email, pet.Name)
+	_, oldPet, err := role.GetPetFromEmailName(ctx, user.Email, pet.Name)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error checking pet profile: "+err.Error())
@@ -383,7 +383,7 @@ func returnPet(c *Context, w http.ResponseWriter, userEmail string, petName stri
 	ctx, _ := c.GetAppengineContext()
 
 	// Get pet from datastore.
-	petKey, pet, err := role.GetPetFromEmail(ctx, userEmail, petName)
+	petKey, pet, err := role.GetPetFromEmailName(ctx, userEmail, petName)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting pet: "+err.Error())

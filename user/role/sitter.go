@@ -17,6 +17,7 @@ const (
 
 type Sitter struct {
 	commonInfo
+	Id           string
 	Description  string
 	HousingType  string
 	Space        string
@@ -54,14 +55,38 @@ func AddSitterForUser(c appengine.Context, sitter *Sitter, userKey *datastore.Ke
 	sitter.UserKey = userKey
 
 	sitterKey := datastore.NewIncompleteKey(c, SitterKind, userKey)
+
+	sitter.Id = sitterKey.Encode()
+
 	return datastore.Put(c, sitterKey, sitter)
 }
 
 func UpdateSitter(c appengine.Context, sitterKey *datastore.Key, sitter *Sitter) (*datastore.Key, error) {
+
+	sitter.Id = sitterKey.Encode()
+
 	return datastore.Put(c, sitterKey, sitter)
 }
 
-func GetSitter(c appengine.Context, userKey *datastore.Key) (*datastore.Key, *Sitter, error) {
+func GetSitter(c appengine.Context, encodedId string) (*datastore.Key, *Sitter, error) {
+	var sitter Sitter
+
+	key, err := datastore.DecodeKey(encodedId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := datastore.Get(c, key, &sitter); err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	return key, &sitter, nil
+}
+
+func GetSitterForUser(c appengine.Context, userKey *datastore.Key) (*datastore.Key, *Sitter, error) {
 	if userKey == nil {
 		return nil, nil, errors.New("user key cannot be nil.")
 	}

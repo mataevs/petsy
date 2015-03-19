@@ -18,6 +18,7 @@ const (
 // A Comment is a descendant of another entity. Thus, a comment has an ancestor key of another entity.
 // There can be a hierarchy of comments (a comment can have a parent).
 type Comment struct {
+	Id        string
 	Author    *user.User `datastore:"-"`
 	Email     string
 	AuthorKey *datastore.Key
@@ -38,11 +39,33 @@ func (c Comment) Validate() error {
 
 func AddComment(c appengine.Context, comment *Comment, commentedEntityKey *datastore.Key) (*datastore.Key, error) {
 	key := datastore.NewIncompleteKey(c, CommentKind, commentedEntityKey)
+
+	comment.Id = key.Encode()
+
 	return datastore.Put(c, key, comment)
 }
 
 func UpdateComment(c appengine.Context, comment *Comment, commentKey *datastore.Key) (*datastore.Key, error) {
+	comment.Id = commentKey.Encode()
 	return datastore.Put(c, commentKey, comment)
+}
+
+func GetComment(c appengine.Context, encodedId string) (*datastore.Key, *Comment, error) {
+	var comment Comment
+
+	key, err := datastore.DecodeKey(encodedId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := datastore.Get(c, key, &comment); err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	return key, &comment, nil
 }
 
 func getAuthorsForComments(c appengine.Context, comments []*Comment) ([]*Comment, error) {

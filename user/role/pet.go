@@ -12,6 +12,7 @@ import (
 
 type Pet struct {
 	ownerid     string
+	Id          string
 	Name        string
 	Species     string
 	Breed       string
@@ -43,14 +44,38 @@ func AddPetForOwner(c appengine.Context, pet *Pet, ownerKey *datastore.Key) (*da
 	pet.ownerid = ownerKey.Encode()
 
 	petKey := datastore.NewIncompleteKey(c, PetKind, ownerKey)
+
+	pet.Id = petKey.Encode()
+
 	return datastore.Put(c, petKey, pet)
 }
 
 func UpdatePet(c appengine.Context, petKey *datastore.Key, pet *Pet) (*datastore.Key, error) {
+
+	pet.Id = petKey.Encode()
+
 	return datastore.Put(c, petKey, pet)
 }
 
-func GetPetFromEmail(c appengine.Context, userEmail string, petName string) (*datastore.Key, *Pet, error) {
+func GetPet(c appengine.Context, encodedId string) (*datastore.Key, *Pet, error) {
+	var pet Pet
+
+	key, err := datastore.DecodeKey(encodedId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := datastore.Get(c, key, &pet); err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	return key, &pet, nil
+}
+
+func GetPetFromEmailName(c appengine.Context, userEmail string, petName string) (*datastore.Key, *Pet, error) {
 	if userEmail == "" {
 		return nil, nil, errors.New("user email cannot be nil.")
 	}

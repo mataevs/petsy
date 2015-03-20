@@ -40,7 +40,7 @@ func getCommentFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *
 
 func addSitterComment(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
 	ctx, _ := c.GetAppengineContext()
 
@@ -49,7 +49,7 @@ func addSitterComment(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, _ := returnSitter(c, w, userEmail)
+	key, _ := returnSitter(c, w, userId)
 	if key == nil {
 		return
 	}
@@ -65,11 +65,11 @@ func addSitterComment(c *Context, w http.ResponseWriter, r *http.Request) {
 
 func getSitterComments(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
 	ctx, _ := c.GetAppengineContext()
 
-	sitterKey, _ := returnSitter(c, w, userEmail)
+	sitterKey, _ := returnSitter(c, w, userId)
 	if sitterKey == nil {
 		return
 	}

@@ -20,10 +20,10 @@ func init() {
 	api.Handle("/profile/{profile}", PetsyAuthJsonHandler(updateProfile)).Methods("POST")
 
 	api.Handle("/sitter", PetsyAuthHandler(addSitter)).Methods("POST")
-	api.Handle("/sitter/{user}", PetsyJsonHandler(getSitter)).Methods("GET")
-	api.Handle("/sitter/{user}", PetsyAuthHandler(updateSitter)).Methods("POST")
-	api.Handle("/sitter/{user}/comment", PetsyAuthHandler(addSitterComment)).Methods("POST")
-	api.Handle("/sitter/{user}/comments", PetsyJsonHandler(getSitterComments)).Methods("GET")
+	api.Handle("/sitter/{userId}", PetsyJsonHandler(getSitter)).Methods("GET")
+	api.Handle("/sitter/{userId}", PetsyAuthHandler(updateSitter)).Methods("POST")
+	api.Handle("/sitter/{userId}/comment", PetsyAuthHandler(addSitterComment)).Methods("POST")
+	api.Handle("/sitter/{userId}/comments", PetsyJsonHandler(getSitterComments)).Methods("GET")
 	api.Handle("/sitters", PetsyJsonHandler(getSitters)).Methods("GET")
 
 	api.Handle("/owner", PetsyAuthHandler(addOwner)).Methods("POST")
@@ -113,11 +113,17 @@ func addSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func returnSitter(c *Context, w http.ResponseWriter, userEmail string) (*datastore.Key, *role.Sitter) {
+func returnSitter(c *Context, w http.ResponseWriter, userId string) (*datastore.Key, *role.Sitter) {
 	ctx, _ := c.GetAppengineContext()
 
+	userKey, err := datastore.DecodeKey(userId)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "error decoding user id: "+err.Error())
+	}
+
 	// Get sitter from datastore.
-	sitterKey, sitter, err := role.GetSitterFromEmail(ctx, userEmail)
+	sitterKey, sitter, err := role.GetSitterForUser(ctx, userKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting sitter profile: "+err.Error())
@@ -135,9 +141,9 @@ func returnSitter(c *Context, w http.ResponseWriter, userEmail string) (*datasto
 func getSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
-	if _, sitter := returnSitter(c, w, userEmail); sitter != nil {
+	if _, sitter := returnSitter(c, w, userId); sitter != nil {
 		JsonResponse(c, sitter)
 	}
 }
@@ -157,20 +163,20 @@ func getSitters(c *Context, w http.ResponseWriter, r *http.Request) {
 
 func updateSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	ctx, _ := c.GetAppengineContext()
-	user, _ := c.GetUser()
+	userKey, _ := c.GetUserKey()
 
 	// Get user email from request url.
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
 	// Allow update only on the logged user.
-	if userEmail != user.Email {
+	if userId != userKey.Encode() {
 		w.WriteHeader(http.StatusForbidden)
 		JsonError(c, 101, "Not allowed to update another user.")
 		return
 	}
 
-	sitterKey, sitter := returnSitter(c, w, userEmail)
+	sitterKey, sitter := returnSitter(c, w, userId)
 	if sitter == nil {
 		return
 	}

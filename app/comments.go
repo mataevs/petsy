@@ -85,7 +85,7 @@ func getSitterComments(c *Context, w http.ResponseWriter, r *http.Request) {
 
 func addOwnerComment(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
 	ctx, _ := c.GetAppengineContext()
 
@@ -94,7 +94,7 @@ func addOwnerComment(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, _ := returnOwner(c, w, userEmail)
+	key, _ := returnOwner(c, w, userId)
 	if key == nil {
 		return
 	}
@@ -110,11 +110,11 @@ func addOwnerComment(c *Context, w http.ResponseWriter, r *http.Request) {
 
 func getOwnerComments(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
 	ctx, _ := c.GetAppengineContext()
 
-	ownerKey, _ := returnOwner(c, w, userEmail)
+	ownerKey, _ := returnOwner(c, w, userId)
 	if ownerKey == nil {
 		return
 	}
@@ -130,8 +130,7 @@ func getOwnerComments(c *Context, w http.ResponseWriter, r *http.Request) {
 
 func addPetComment(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
-	petName := vars["pet"]
+	petId := vars["petId"]
 
 	ctx, _ := c.GetAppengineContext()
 
@@ -140,7 +139,7 @@ func addPetComment(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, _ := returnPet(c, w, userEmail, petName)
+	key, _ := returnPet(c, w, petId)
 	if key == nil {
 		return
 	}
@@ -156,12 +155,11 @@ func addPetComment(c *Context, w http.ResponseWriter, r *http.Request) {
 
 func getPetComments(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
-	petName := vars["pet"]
+	petId := vars["petId"]
 
 	ctx, _ := c.GetAppengineContext()
 
-	petKey, _ := returnPet(c, w, userEmail, petName)
+	petKey, _ := returnPet(c, w, petId)
 	if petKey == nil {
 		return
 	}

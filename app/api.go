@@ -27,18 +27,18 @@ func init() {
 	api.Handle("/sitters", PetsyJsonHandler(getSitters)).Methods("GET")
 
 	api.Handle("/owner", PetsyAuthHandler(addOwner)).Methods("POST")
-	api.Handle("/owner/{user}", PetsyJsonHandler(getOwner)).Methods("GET")
-	api.Handle("/owner/{user}", PetsyAuthHandler(updateOwner)).Methods("POST")
-	api.Handle("/owner/{user}/comment", PetsyAuthHandler(addOwnerComment)).Methods("POST")
-	api.Handle("/owner/{user}/comments", PetsyJsonHandler(getOwnerComments)).Methods("GET")
+	api.Handle("/owner/{userId}", PetsyJsonHandler(getOwner)).Methods("GET")
+	api.Handle("/owner/{userId}", PetsyAuthHandler(updateOwner)).Methods("POST")
+	api.Handle("/owner/{userId}/comment", PetsyAuthHandler(addOwnerComment)).Methods("POST")
+	api.Handle("/owner/{userId}/comments", PetsyJsonHandler(getOwnerComments)).Methods("GET")
 	api.Handle("/owners", PetsyJsonHandler(getOwners)).Methods("GET")
 
 	api.Handle("/pet", PetsyAuthHandler(addPet)).Methods("POST")
-	api.Handle("/owner/{user}/pet/{pet}", PetsyJsonHandler(getPet)).Methods("GET")
-	api.Handle("/owner/{user}/pet/{pet}", PetsyAuthHandler(updatePet)).Methods("POST")
-	api.Handle("/owner/{user}/pet/{pet}/comment", PetsyAuthHandler(addPetComment)).Methods("POST")
-	api.Handle("/owner/{user}/pet/{pet}/comments", PetsyJsonHandler(getPetComments)).Methods("GET")
-	api.Handle("/owner/{user}/pets", PetsyJsonHandler(getPets)).Methods("GET")
+	api.Handle("/pet/{pet}", PetsyJsonHandler(getPet)).Methods("GET")
+	api.Handle("/pet/{pet}", PetsyAuthHandler(updatePet)).Methods("POST")
+	api.Handle("/pet/{pet}/comment", PetsyAuthHandler(addPetComment)).Methods("POST")
+	api.Handle("/pet/{pet}/comments", PetsyJsonHandler(getPetComments)).Methods("GET")
+	api.Handle("/owner/{userId}/pets", PetsyJsonHandler(getPets)).Methods("GET")
 
 	http.Handle("/api/", api)
 }
@@ -251,11 +251,11 @@ func addOwner(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func returnOwner(c *Context, w http.ResponseWriter, userEmail string) (*datastore.Key, *role.Owner) {
+func returnOwner(c *Context, w http.ResponseWriter, userId string) (*datastore.Key, *role.Owner) {
 	ctx, _ := c.GetAppengineContext()
 
 	// Get owner from datastore.
-	ownerKey, owner, err := role.GetOwnerFromEmail(ctx, userEmail)
+	ownerKey, owner, err := role.GetOwner(ctx, userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting owner profile: "+err.Error())
@@ -273,9 +273,9 @@ func returnOwner(c *Context, w http.ResponseWriter, userEmail string) (*datastor
 func getOwner(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
-	if _, owner := returnOwner(c, w, userEmail); owner != nil {
+	if _, owner := returnOwner(c, w, userId); owner != nil {
 		JsonResponse(c, owner)
 	}
 }
@@ -296,19 +296,19 @@ func getOwners(c *Context, w http.ResponseWriter, r *http.Request) {
 func updateOwner(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
 	ctx, _ := c.GetAppengineContext()
 	user, _ := c.GetUser()
 
 	// Allow update only on the logged user.
-	if userEmail != user.Email {
+	if userId != user.Id {
 		w.WriteHeader(http.StatusForbidden)
 		JsonError(c, 101, "Not allowed to update another user.")
 		return
 	}
 
-	ownerKey, owner := returnOwner(c, w, userEmail)
+	ownerKey, owner := returnOwner(c, w, userId)
 	if owner == nil {
 		return
 	}
@@ -385,11 +385,11 @@ func addPet(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func returnPet(c *Context, w http.ResponseWriter, userEmail string, petName string) (*datastore.Key, *role.Pet) {
+func returnPet(c *Context, w http.ResponseWriter, petId string) (*datastore.Key, *role.Pet) {
 	ctx, _ := c.GetAppengineContext()
 
 	// Get pet from datastore.
-	petKey, pet, err := role.GetPetFromEmailName(ctx, userEmail, petName)
+	petKey, pet, err := role.GetPet(ctx, petId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting pet: "+err.Error())
@@ -407,21 +407,20 @@ func returnPet(c *Context, w http.ResponseWriter, userEmail string, petName stri
 func getPet(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
-	petName := vars["pet"]
+	petId := vars["petId"]
 
-	if _, pet := returnPet(c, w, userEmail, petName); pet != nil {
+	if _, pet := returnPet(c, w, petId); pet != nil {
 		JsonResponse(c, pet)
 	}
 }
 
 func getPets(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
+	userId := vars["userId"]
 
 	ctx, _ := c.GetAppengineContext()
 
-	_, pets, err := role.GetPetsFromEmail(ctx, userEmail)
+	_, pets, err := role.GetPetsForUser(ctx, userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting pet profiles: "+err.Error())
@@ -434,21 +433,34 @@ func getPets(c *Context, w http.ResponseWriter, r *http.Request) {
 func updatePet(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
-	userEmail := vars["user"]
-	petName := vars["pet"]
+	petId := vars["petId"]
 
 	ctx, _ := c.GetAppengineContext()
-	user, _ := c.GetUser()
+	userKey, _ := c.GetUserKey()
 
-	// Allow update only on the logged user.
-	if userEmail != user.Email {
-		w.WriteHeader(http.StatusForbidden)
-		JsonError(c, 101, "Not allowed to update another user.")
+	// Get the pet profile.
+	petKey, pet := returnPet(c, w, petId)
+	if petKey == nil {
 		return
 	}
 
-	petKey, _ := returnPet(c, w, userEmail, petName)
-	if petKey == nil {
+	// Get the owner profile.
+	ownerId := pet.OwnerId
+	_, owner, err := role.GetOwner(ctx, ownerId)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting owner profile: "+err.Error())
+		return
+	}
+	if owner == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		JsonError(c, 101, "owner not found")
+		return
+	}
+	// Check if the logged user updates its own pet.
+	if owner.UserKey != userKey {
+		w.WriteHeader(http.StatusUnauthorized)
+		JsonError(c, 101, "not allowed to modify pet not belonging to another user.")
 		return
 	}
 

@@ -11,7 +11,7 @@ import (
 )
 
 type Pet struct {
-	ownerid     string
+	OwnerId     string
 	Id          string
 	Name        string
 	Species     string
@@ -41,7 +41,7 @@ func AddPet(c appengine.Context, pet *Pet, owner *Owner) (*datastore.Key, error)
 }
 
 func AddPetForOwner(c appengine.Context, pet *Pet, ownerKey *datastore.Key) (*datastore.Key, error) {
-	pet.ownerid = ownerKey.Encode()
+	pet.OwnerId = ownerKey.Encode()
 
 	petKey := datastore.NewIncompleteKey(c, PetKind, ownerKey)
 
@@ -95,6 +95,37 @@ func GetPetFromEmailName(c appengine.Context, userEmail string, petName string) 
 	}
 
 	return nil, nil, nil
+}
+
+func GetPetsForUser(c appengine.Context, userId string) (keys []*datastore.Key, pets []*Pet, err error) {
+	if userId == "" {
+		return nil, nil, errors.New("user id cannot be nil.")
+	}
+
+	ownerKey, _, err := GetOwner(c, userId)
+	if err != nil {
+		return nil, nil, err
+	}
+	if ownerKey == nil {
+		return nil, nil, errors.New("no owner profile defined for this email.")
+	}
+
+	query := datastore.NewQuery(PetKind).Ancestor(ownerKey)
+
+	for t := query.Run(c); ; {
+		var pet Pet
+		key, err := t.Next(&pet)
+		if err == datastore.Done {
+			return keys, pets, nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		keys = append(keys, key)
+		pets = append(pets, &pet)
+	}
+
+	return
 }
 
 func GetPetsFromEmail(c appengine.Context, userEmail string) (keys []*datastore.Key, pets []*Pet, err error) {

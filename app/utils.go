@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"log"
 
 	"petsy/handler/json"
 )
@@ -26,6 +27,8 @@ func randomString(size int) (string, error) {
 }
 
 func JsonError(c *Context, code int, message string) {
+	log.Println("JsonError: code=", code, "message=", message)
+
 	err := &(struct {
 		code    int
 		message string

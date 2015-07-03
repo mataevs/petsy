@@ -4,6 +4,7 @@ package petsy
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"petsy/user/role"
@@ -57,6 +58,8 @@ func getSitterFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *r
 	user, _ := c.GetUser()
 
 	var sitter role.Sitter
+
+	log.Println(r.Body)
 
 	// Get sitter struct from JSON request.
 	dec := json.NewDecoder(r.Body)

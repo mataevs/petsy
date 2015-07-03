@@ -19,11 +19,11 @@ type Sitter struct {
 	commonInfo
 	Id           string
 	Description  string
-	HousingType  string
+	HousingType  string `json:"housing_type"`
 	Space        string
 	Prices       string
-	OwnsPets     bool
-	HasCar       bool
+	OwnedPets    string `json:"owned_pets"`
+	OwnedCar     string `json:"owned_car"`
 	ResponseRate float32
 	ResponseTime float32
 	Rating       string

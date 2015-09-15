@@ -17,12 +17,12 @@ func init() {
 
 	pages.Handle("/sitter", PetsyAuthHandler(showAddSitter)).Methods("GET")
 	pages.Handle("/sitter/{userId}", PetsyHandler(showSitter)).Methods("GET")
-	pages.Handle("/sitter/{userId}/update", PetsyAuthHandler(showUpdateSitter)).Methods("GET")
+	pages.Handle("/sitter/update", PetsyAuthHandler(showUpdateSitter)).Methods("GET")
 	pages.Handle("/sitters", PetsyHandler(showSitters)).Methods("GET")
 
 	pages.Handle("/owner", PetsyAuthHandler(showAddOwner)).Methods("GET")
 	pages.Handle("/owner/{userId}", PetsyHandler(showOwner)).Methods("GET")
-	pages.Handle("/owner/{userId}/update", PetsyAuthHandler(showUpdateOwner)).Methods("GET")
+	pages.Handle("/owner/update", PetsyAuthHandler(showUpdateOwner)).Methods("GET")
 	pages.Handle("/owners", PetsyHandler(showOwners)).Methods("GET")
 
 	pages.Handle("/pet", PetsyAuthHandler(showAddPet)).Methods("GET")
@@ -54,7 +54,8 @@ func showAddSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func showSitter(c *Context, w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("show sitter page"))
+	t, _ := template.ParseFiles("templates/sitter_show.html")
+	t.Execute(w, nil)
 }
 
 func showUpdateSitter(c *Context, w http.ResponseWriter, r *http.Request) {

@@ -20,6 +20,7 @@ func init() {
 	api.Handle("/profile/{profile}", PetsyJsonHandler(getProfile)).Methods("GET")
 	api.Handle("/profile/{profile}", PetsyAuthJsonHandler(updateProfile)).Methods("POST")
 
+	api.Handle("/sitter", PetsyAuthHandler(getOwnSitter)).Methods("GET")
 	api.Handle("/sitter", PetsyAuthHandler(addSitter)).Methods("POST")
 	api.Handle("/sitter/{userId}", PetsyJsonHandler(getSitter)).Methods("GET")
 	api.Handle("/sitter/{userId}", PetsyAuthHandler(updateSitter)).Methods("POST")
@@ -139,6 +140,25 @@ func returnSitter(c *Context, w http.ResponseWriter, userId string) (*datastore.
 	}
 
 	return sitterKey, sitter
+}
+
+func getOwnSitter(c *Context, w http.ResponseWriter, r *http.Request) {
+	ctx, _ := c.GetAppengineContext()
+	userKey, _ := c.GetUserKey()
+
+	_, sitter, err := role.GetSitterForUser(ctx, userKey)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		JsonError(c, 101, "error getting sitter profile: "+err.Error())
+	}
+	if sitter == nil {
+		w.WriteHeader(http.StatusNotFound)
+		JsonError(c, 101, "sitter does not exist")
+	}
+
+	log.Println("getOwnSitter", sitter)
+
+	JsonResponse(c, sitter)
 }
 
 func getSitter(c *Context, w http.ResponseWriter, r *http.Request) {

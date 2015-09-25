@@ -8,7 +8,7 @@ import (
 )
 
 type commonInfo struct {
-	UserKey   *datastore.Key
+	UserKey   *datastore.Key `json:"-"`
 	Name      string
 	Email     string
 	Page      string

@@ -12,9 +12,9 @@ import (
 
 type Owner struct {
 	commonInfo
-	Id          string
+	Id          string `json:"-"`
 	Description string
-	Rating      string
+	Rating      string `json:"omitempty"`
 	Pets        []Pet
 }
 

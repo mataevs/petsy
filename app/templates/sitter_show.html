@@ -14,17 +14,23 @@
 			userId = getUserId()
 			console.log(userId)
 
-			$.getJSON('/api/sitter/' + userId, function(data) {
-				console.log(data);
+			$.getJSON('/api/sitter/' + userId, function(sitterProfile) {
+				console.log(sitterProfile);
+
+				var sitterProfileTable = "<table>";
+				for (key in sitterProfile) {
+					sitterProfileTable += "<tr>";
+					sitterProfileTable += "<td>" + key + "</td>";
+					sitterProfileTable += "<td>" + sitterProfile[key] + "</td>";
+					sitterProfileTable += "</tr>";
+				}
+				sitterProfileTable += "</table>";
+
+				$("#sitterProfile").html(sitterProfileTable);
 			});
 		</script>
 	</head>
 	<body>
-		<table>
-			<tr>
-				<td></td>
-				<td></td>
-			</tr>
-		</table>
+		<div id="sitterProfile"></div>
 	</body>
 </html>

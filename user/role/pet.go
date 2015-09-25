@@ -11,8 +11,8 @@ import (
 )
 
 type Pet struct {
-	OwnerId     string
-	Id          string
+	OwnerId     string `json:"-"`
+	Id          string `json:"-"`
 	Name        string
 	Species     string
 	Breed       string

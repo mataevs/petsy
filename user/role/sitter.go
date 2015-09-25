@@ -17,16 +17,16 @@ const (
 
 type Sitter struct {
 	commonInfo
-	Id           string
+	Id           string `json:"-"`
 	Description  string
 	HousingType  string `json:"housing_type"`
 	Space        string
 	Prices       string
-	OwnedPets    string `json:"owned_pets"`
-	OwnedCar     string `json:"owned_car"`
-	ResponseRate float32
-	ResponseTime float32
-	Rating       string
+	OwnedPets    string  `json:"owned_pets"`
+	OwnedCar     string  `json:"owned_car"`
+	ResponseRate float32 `json:"omitempty"`
+	ResponseTime float32 `json:"omitempty"`
+	Rating       string  `json:"omitempty"`
 }
 
 func (s Sitter) Validate() error {

@@ -1,10 +1,14 @@
 package petsy
 
 import (
+	"encoding/json"
 	"html/template"
 	"net/http"
+	"petsy/user/role"
 
 	"github.com/gorilla/mux"
+
+	"appengine/urlfetch"
 )
 
 func init() {
@@ -54,8 +58,30 @@ func showAddSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func showSitter(c *Context, w http.ResponseWriter, r *http.Request) {
-	t, _ := template.ParseFiles("templates/sitter_show.html")
-	t.Execute(w, nil)
+	ctx, _ := c.GetAppengineContext()
+
+	vars := mux.Vars(r)
+	userId := vars["userId"]
+
+	client := urlfetch.Client(ctx)
+	resp, err := client.Get("http://localhost:8080/api/sitter/" + userId)
+	if err != nil {
+		w.Write([]byte("Error"))
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		w.Write([]byte("Error getting sitter profile"))
+	}
+
+	var sitter role.Sitter
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&sitter); err != nil {
+		w.Write([]byte("Error retrieving sitter profile."))
+	}
+
+	t, _ := template.ParseFiles("templates/sitter_template.html")
+	t.Execute(w, sitter)
 }
 
 func showUpdateSitter(c *Context, w http.ResponseWriter, r *http.Request) {

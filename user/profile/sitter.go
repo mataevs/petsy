@@ -1,6 +1,6 @@
 // +build appengine
 
-package role
+package profile
 
 import (
 	"errors"
@@ -16,17 +16,16 @@ const (
 )
 
 type Sitter struct {
-	commonInfo
-	Id           string `json:"-"`
-	Description  string
-	HousingType  string `json:"housing_type"`
-	Space        string
-	Prices       string
-	OwnedPets    string  `json:"owned_pets"`
-	OwnedCar     string  `json:"owned_car"`
-	ResponseRate float32 `json:"omitempty"`
-	ResponseTime float32 `json:"omitempty"`
-	Rating       string  `json:"omitempty"`
+	UserProfile
+	SitterDescription string
+	HousingType       string `json:"housing_type"`
+	Space             string
+	Prices            string
+	OwnedPets         string  `json:"owned_pets"`
+	OwnedCar          string  `json:"owned_car"`
+	ResponseRate      float32 `json:"omitempty"`
+	ResponseTime      float32 `json:"omitempty"`
+	Rating            string  `json:"omitempty"`
 }
 
 func (s Sitter) Validate() error {
@@ -48,22 +47,18 @@ func AddSitter(c appengine.Context, sitter *Sitter) (*datastore.Key, error) {
 		return nil, errors.New("Cannot find user with specified email.")
 	}
 
-	return AddSitterForUser(c, sitter, userKey)
+	return AddSitterForUserKey(c, sitter, userKey)
 }
 
-func AddSitterForUser(c appengine.Context, sitter *Sitter, userKey *datastore.Key) (*datastore.Key, error) {
+func AddSitterForUserKey(c appengine.Context, sitter *Sitter, userKey *datastore.Key) (*datastore.Key, error) {
 	sitter.UserKey = userKey
 
 	sitterKey := datastore.NewIncompleteKey(c, SitterKind, userKey)
-
-	sitter.Id = sitterKey.Encode()
 
 	return datastore.Put(c, sitterKey, sitter)
 }
 
 func UpdateSitter(c appengine.Context, sitterKey *datastore.Key, sitter *Sitter) (*datastore.Key, error) {
-
-	sitter.Id = sitterKey.Encode()
 
 	return datastore.Put(c, sitterKey, sitter)
 }
@@ -86,7 +81,7 @@ func GetSitter(c appengine.Context, encodedId string) (*datastore.Key, *Sitter, 
 	return key, &sitter, nil
 }
 
-func GetSitterForUser(c appengine.Context, userKey *datastore.Key) (*datastore.Key, *Sitter, error) {
+func GetSitterForUserKey(c appengine.Context, userKey *datastore.Key) (*datastore.Key, *Sitter, error) {
 	if userKey == nil {
 		return nil, nil, errors.New("user key cannot be nil.")
 	}
@@ -108,7 +103,7 @@ func GetSitterForUser(c appengine.Context, userKey *datastore.Key) (*datastore.K
 	return nil, nil, nil
 }
 
-func GetSitterFromEmail(c appengine.Context, userEmail string) (*datastore.Key, *Sitter, error) {
+func GetSitterForEmail(c appengine.Context, userEmail string) (*datastore.Key, *Sitter, error) {
 	if userEmail == "" {
 		return nil, nil, errors.New("user email cannot be nil.")
 	}

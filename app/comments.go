@@ -83,7 +83,7 @@ func getSitterComments(c *Context, w http.ResponseWriter, r *http.Request) {
 	JsonResponse(c, comments)
 }
 
-func addOwnerComment(c *Context, w http.ResponseWriter, r *http.Request) {
+func addProfileComment(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userId := vars["userId"]
 
@@ -94,7 +94,7 @@ func addOwnerComment(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, _ := returnOwner(c, w, userId)
+	key, _ := returnProfile(c, w, userId)
 	if key == nil {
 		return
 	}
@@ -108,13 +108,13 @@ func addOwnerComment(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func getOwnerComments(c *Context, w http.ResponseWriter, r *http.Request) {
+func getProfileComments(c *Context, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userId := vars["userId"]
 
 	ctx, _ := c.GetAppengineContext()
 
-	ownerKey, _ := returnOwner(c, w, userId)
+	ownerKey, _ := returnProfile(c, w, userId)
 	if ownerKey == nil {
 		return
 	}

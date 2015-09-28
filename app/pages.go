@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
-	"petsy/user/role"
+	"petsy/user/profile"
 
 	"github.com/gorilla/mux"
 
@@ -74,7 +74,7 @@ func showSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Error getting sitter profile"))
 	}
 
-	var sitter role.Sitter
+	var sitter profile.Sitter
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&sitter); err != nil {
 		w.Write([]byte("Error retrieving sitter profile."))

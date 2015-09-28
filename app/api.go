@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 
-	"petsy/user/role"
+	"petsy/user/profile"
 
 	"appengine/datastore"
 
@@ -17,8 +17,8 @@ import (
 func init() {
 	api := mux.NewRouter().PathPrefix("/api/").Subrouter()
 
-	api.Handle("/profile/{profile}", PetsyJsonHandler(getProfile)).Methods("GET")
-	api.Handle("/profile/{profile}", PetsyAuthJsonHandler(updateProfile)).Methods("POST")
+	// api.Handle("/user/{profile}", PetsyJsonHandler(getUser)).Methods("GET")
+	// api.Handle("/user/{profile}", PetsyAuthJsonHandler(updateProfile)).Methods("POST")
 
 	api.Handle("/sitter", PetsyAuthHandler(getOwnSitter)).Methods("GET")
 	api.Handle("/sitter", PetsyAuthHandler(addSitter)).Methods("POST")
@@ -28,12 +28,13 @@ func init() {
 	api.Handle("/sitter/{userId}/comments", PetsyJsonHandler(getSitterComments)).Methods("GET")
 	api.Handle("/sitters", PetsyJsonHandler(getSitters)).Methods("GET")
 
-	api.Handle("/owner", PetsyAuthHandler(addOwner)).Methods("POST")
-	api.Handle("/owner/{userId}", PetsyJsonHandler(getOwner)).Methods("GET")
-	api.Handle("/owner/{userId}", PetsyAuthHandler(updateOwner)).Methods("POST")
-	api.Handle("/owner/{userId}/comment", PetsyAuthHandler(addOwnerComment)).Methods("POST")
-	api.Handle("/owner/{userId}/comments", PetsyJsonHandler(getOwnerComments)).Methods("GET")
-	api.Handle("/owners", PetsyJsonHandler(getOwners)).Methods("GET")
+	// todo - get own profile
+	api.Handle("/profile", PetsyAuthHandler(addProfile)).Methods("POST")
+	api.Handle("/profile/{userId}", PetsyJsonHandler(getProfile)).Methods("GET")
+	api.Handle("/profile/{userId}", PetsyAuthHandler(updateProfile)).Methods("POST")
+	api.Handle("/profile/{userId}/comment", PetsyAuthHandler(addProfileComment)).Methods("POST")
+	api.Handle("/profile/{userId}/comments", PetsyJsonHandler(getProfileComments)).Methods("GET")
+	api.Handle("/profiles", PetsyJsonHandler(getProfiles)).Methods("GET")
 
 	api.Handle("/pet", PetsyAuthHandler(addPet)).Methods("POST")
 	api.Handle("/pet/{pet}", PetsyJsonHandler(getPet)).Methods("GET")
@@ -45,20 +46,20 @@ func init() {
 	http.Handle("/api/", api)
 }
 
-func getProfile(c *Context, w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	JsonError(c, 101, "update profile - not implemented")
-}
+// func getProfile(c *Context, w http.ResponseWriter, r *http.Request) {
+// 	w.WriteHeader(http.StatusNotImplemented)
+// 	JsonError(c, 101, "update profile - not implemented")
+// }
 
-func updateProfile(c *Context, w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	JsonError(c, 101, "update profile - not implemented")
-}
+// func updateProfile(c *Context, w http.ResponseWriter, r *http.Request) {
+// 	w.WriteHeader(http.StatusNotImplemented)
+// 	JsonError(c, 101, "update profile - not implemented")
+// }
 
-func getSitterFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *role.Sitter {
+func getSitterFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *profile.Sitter {
 	user, _ := c.GetUser()
 
-	var sitter role.Sitter
+	var sitter profile.Sitter
 
 	log.Println(r.Body)
 
@@ -95,7 +96,7 @@ func addSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if there is another sitter profile for this user.
-	_, oldSitter, err := role.GetSitterForUser(ctx, userKey)
+	_, oldSitter, err := profile.GetSitterForUserKey(ctx, userKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error decoding data: "+err.Error())
@@ -108,7 +109,7 @@ func addSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add the sitter profile.
-	if _, err := role.AddSitterForUser(ctx, sitter, userKey); err != nil {
+	if _, err := profile.AddSitterForUserKey(ctx, sitter, userKey); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error adding sitter profile: "+err.Error())
 		return
@@ -117,7 +118,7 @@ func addSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func returnSitter(c *Context, w http.ResponseWriter, userId string) (*datastore.Key, *role.Sitter) {
+func returnSitter(c *Context, w http.ResponseWriter, userId string) (*datastore.Key, *profile.Sitter) {
 	ctx, _ := c.GetAppengineContext()
 
 	userKey, err := datastore.DecodeKey(userId)
@@ -127,7 +128,7 @@ func returnSitter(c *Context, w http.ResponseWriter, userId string) (*datastore.
 	}
 
 	// Get sitter from datastore.
-	sitterKey, sitter, err := role.GetSitterForUser(ctx, userKey)
+	sitterKey, sitter, err := profile.GetSitterForUserKey(ctx, userKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting sitter profile: "+err.Error())
@@ -146,7 +147,7 @@ func getOwnSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	ctx, _ := c.GetAppengineContext()
 	userKey, _ := c.GetUserKey()
 
-	_, sitter, err := role.GetSitterForUser(ctx, userKey)
+	_, sitter, err := profile.GetSitterForUserKey(ctx, userKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting sitter profile: "+err.Error())
@@ -174,7 +175,7 @@ func getSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 func getSitters(c *Context, w http.ResponseWriter, r *http.Request) {
 	ctx, _ := c.GetAppengineContext()
 
-	_, sitters, err := role.GetSitters(ctx)
+	_, sitters, err := profile.GetSitters(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting sitter profiles: "+err.Error())
@@ -210,113 +211,113 @@ func updateSitter(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update sitter.
-	if _, err := role.UpdateSitter(ctx, sitterKey, newSitter); err != nil {
+	if _, err := profile.UpdateSitter(ctx, sitterKey, newSitter); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error saving sitter: "+err.Error())
 		return
 	}
 }
 
-func getOwnerFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *role.Owner {
+func getProfileFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *profile.UserProfile {
 	user, _ := c.GetUser()
 
-	var owner role.Owner
+	var profile profile.UserProfile
 
-	// Get owner struct from JSON request.
+	// Get profile struct from JSON request.
 	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(&owner); err != nil {
+	if err := dec.Decode(&profile); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		JsonError(c, 101, "error decoding data: "+err.Error())
 		return nil
 	}
 
-	// Validate owner struct fields.
-	if err := owner.Validate(); err != nil {
+	// Validate profile struct fields.
+	if err := profile.Validate(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		JsonError(c, 101, "invalid sitter data: "+err.Error())
 		return nil
 	}
 
-	owner = owner.AddCommonData(user)
+	profile = profile.AddCommonData(user)
 
-	return &owner
+	return &profile
 }
 
-func addOwner(c *Context, w http.ResponseWriter, r *http.Request) {
+func addProfile(c *Context, w http.ResponseWriter, r *http.Request) {
 	ctx, _ := c.GetAppengineContext()
 	userKey, _ := c.GetUserKey()
 
-	owner := getOwnerFromRequest(c, w, r)
-	if owner == nil {
+	p := getProfileFromRequest(c, w, r)
+	if p == nil {
 		return
 	}
 
-	// Check if there is another owner profile for this user.
-	_, oldOwner, err := role.GetOwnerForUser(ctx, userKey)
+	// Check if there is another profile for this user.
+	_, oldProfile, err := profile.GetProfileForUserKey(ctx, userKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		JsonError(c, 101, "error checking existing owner profile: "+err.Error())
+		JsonError(c, 101, "error checking existing profile: "+err.Error())
 		return
 	}
-	if oldOwner != nil {
+	if oldProfile != nil {
 		w.WriteHeader(http.StatusForbidden)
-		JsonError(c, 101, "User already has an owner profile associated.")
+		JsonError(c, 101, "User already has a profile associated.")
 		return
 	}
 
-	// Add the owner profile.
-	if _, err := role.AddOwnerForUser(ctx, owner, userKey); err != nil {
+	// Add the profile.
+	if _, err := profile.AddProfileForUserKey(ctx, p, userKey); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		JsonError(c, 101, "Error adding the owner profile: "+err.Error())
+		JsonError(c, 101, "Error adding the profile: "+err.Error())
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 }
 
-func returnOwner(c *Context, w http.ResponseWriter, userId string) (*datastore.Key, *role.Owner) {
+func returnProfile(c *Context, w http.ResponseWriter, userId string) (*datastore.Key, *profile.UserProfile) {
 	ctx, _ := c.GetAppengineContext()
 
-	// Get owner from datastore.
-	ownerKey, owner, err := role.GetOwner(ctx, userId)
+	// Get profile from datastore.
+	profileKey, p, err := profile.GetProfile(ctx, userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		JsonError(c, 101, "error getting owner profile: "+err.Error())
+		JsonError(c, 101, "error getting profile: "+err.Error())
 		return nil, nil
 	}
-	if owner == nil {
+	if p == nil {
 		w.WriteHeader(http.StatusNotFound)
-		JsonError(c, 101, "owner does not exist")
+		JsonError(c, 101, "profile does not exist")
 		return nil, nil
 	}
 
-	return ownerKey, owner
+	return profileKey, p
 }
 
-func getOwner(c *Context, w http.ResponseWriter, r *http.Request) {
+func getProfile(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
 	userId := vars["userId"]
 
-	if _, owner := returnOwner(c, w, userId); owner != nil {
-		JsonResponse(c, owner)
+	if _, p := returnProfile(c, w, userId); p != nil {
+		JsonResponse(c, p)
 	}
 }
 
-func getOwners(c *Context, w http.ResponseWriter, r *http.Request) {
+func getProfiles(c *Context, w http.ResponseWriter, r *http.Request) {
 	ctx, _ := c.GetAppengineContext()
 
-	_, owners, err := role.GetOwners(ctx)
+	_, profiles, err := profile.GetProfiles(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting owners: %v"+err.Error())
 		return
 	}
 
-	JsonResponse(c, owners)
+	JsonResponse(c, profiles)
 }
 
-func updateOwner(c *Context, w http.ResponseWriter, r *http.Request) {
+func updateProfile(c *Context, w http.ResponseWriter, r *http.Request) {
 	// Get user email from request url.
 	vars := mux.Vars(r)
 	userId := vars["userId"]
@@ -331,26 +332,26 @@ func updateOwner(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ownerKey, owner := returnOwner(c, w, userId)
-	if owner == nil {
+	profileKey, p := returnProfile(c, w, userId)
+	if p == nil {
 		return
 	}
 
-	newOwner := getOwnerFromRequest(c, w, r)
-	if newOwner == nil {
+	newProfile := getProfileFromRequest(c, w, r)
+	if newProfile == nil {
 		return
 	}
 
-	// Update owner.
-	if _, err := role.UpdateOwner(ctx, ownerKey, newOwner); err != nil {
+	// Update profile.
+	if _, err := profile.UpdateProfile(ctx, profileKey, newProfile); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error saving owner: "+err.Error())
 		return
 	}
 }
 
-func getPetFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *role.Pet {
-	var pet role.Pet
+func getPetFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *profile.Pet {
+	var pet profile.Pet
 
 	// Get pet struct from JSON request.
 	dec := json.NewDecoder(r.Body)
@@ -373,20 +374,19 @@ func getPetFromRequest(c *Context, w http.ResponseWriter, r *http.Request) *role
 func addPet(c *Context, w http.ResponseWriter, r *http.Request) {
 	ctx, _ := c.GetAppengineContext()
 	user, _ := c.GetUser()
-	userKey, _ := c.GetUserKey()
 
 	pet := getPetFromRequest(c, w, r)
 	if pet == nil {
 		return
 	}
 
-	ownerKey, _ := returnOwner(c, w, user.Email)
-	if ownerKey == nil {
+	profileKey, _ := returnProfile(c, w, user.Email)
+	if profileKey == nil {
 		return
 	}
 
 	// Check if there exists the pet in the datastore.
-	_, oldPet, err := role.GetPetFromEmailName(ctx, user.Email, pet.Name)
+	_, oldPet, err := profile.GetPetForNameEmail(ctx, user.Email, pet.Name)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error checking pet profile: "+err.Error())
@@ -399,7 +399,7 @@ func addPet(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add the pet profile.
-	if _, err := role.AddPetForOwner(ctx, pet, userKey); err != nil {
+	if _, err := profile.AddPetForProfileKey(ctx, pet, profileKey); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error storing pet profile: "+err.Error())
 		return
@@ -408,11 +408,11 @@ func addPet(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func returnPet(c *Context, w http.ResponseWriter, petId string) (*datastore.Key, *role.Pet) {
+func returnPet(c *Context, w http.ResponseWriter, petId string) (*datastore.Key, *profile.Pet) {
 	ctx, _ := c.GetAppengineContext()
 
 	// Get pet from datastore.
-	petKey, pet, err := role.GetPet(ctx, petId)
+	petKey, pet, err := profile.GetPet(ctx, petId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting pet: "+err.Error())
@@ -443,7 +443,7 @@ func getPets(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	ctx, _ := c.GetAppengineContext()
 
-	_, pets, err := role.GetPetsForUser(ctx, userId)
+	_, pets, err := profile.GetPetsForUser(ctx, userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting pet profiles: "+err.Error())
@@ -467,21 +467,21 @@ func updatePet(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the owner profile.
-	ownerId := pet.OwnerId
-	_, owner, err := role.GetOwner(ctx, ownerId)
+	// Get the owner's user profile.
+	ownerProfileId := pet.OwnerProfileId
+	_, ownerProfile, err := profile.GetProfile(ctx, ownerProfileId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error getting owner profile: "+err.Error())
 		return
 	}
-	if owner == nil {
+	if ownerProfile == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		JsonError(c, 101, "owner not found")
 		return
 	}
 	// Check if the logged user updates its own pet.
-	if owner.UserKey != userKey {
+	if ownerProfile.UserKey != userKey {
 		w.WriteHeader(http.StatusUnauthorized)
 		JsonError(c, 101, "not allowed to modify pet not belonging to another user.")
 		return
@@ -493,7 +493,7 @@ func updatePet(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update pet.
-	if _, err := role.UpdatePet(ctx, petKey, newPet); err != nil {
+	if _, err := profile.UpdatePet(ctx, petKey, newPet); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		JsonError(c, 101, "error updating pet profile: "+err.Error())
 		return

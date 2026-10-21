@@ -19,6 +19,12 @@ handlers:
 - url: /auth/.*
   script: _go_app
 
-- url: /.*
+- url: /links/.*
+  script: _go_app
+
+- url: /
   static_files: static/index.html
   upload: static/index.html
+
+- url: /.*
+  script: _go_app

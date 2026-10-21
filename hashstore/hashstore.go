@@ -1,3 +1,5 @@
+// +build appengine
+
 // Package hashstore implements a hash store over Appengine's datastore.
 // The hashstore holds expirable (key, value, scope) string tuples.
 package hashstore

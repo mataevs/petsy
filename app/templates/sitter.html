@@ -1,0 +1,45 @@
+<html>
+	<head>
+		<title>Create Sitter Profile</title>
+
+		<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+		<script src="/js/jquery-serialize-object.js"></script>
+	</head>
+	<body>
+		<script type="text/javascript">
+			function submitform(submitEvent) {
+				submitEvent.preventDefault();
+
+				var formData = $('form#sitterForm').serializeJSON();
+
+				console.log(formData);
+
+				$.ajax({
+					type: "POST",
+					url: "/api/sitter",
+					data: formData,
+					success: alert("Success"),
+					dataType: "json",
+					contentType: "application/json"
+				});
+
+				return false;
+			}
+		</script>
+
+		<form id="sitterForm">
+			<p>Your Description<input type="text" name="description"></p>
+			<p>Housing Type<input type="text" name="housing_type"></p>
+			<p>Space<input type="text" name="space"></p>
+			<p>Prices<input type="text" name="prices"></p>
+			<p>Do you have any pet?<input type="" name="owned_pets"></p>
+			<p>Do you have a car?<input type="" name="owned_car"></p>
+			<p><button>Create</button></p>
+		</form>
+
+		<script type="text/javascript">
+			var form = document.getElementById("sitterForm");
+			form.onsubmit = submitform;
+		</script>
+	</body>
+</html>
